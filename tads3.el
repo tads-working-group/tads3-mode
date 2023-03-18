@@ -123,7 +123,6 @@
         (define-key tads3-mode-map "\M-n" 'tads3-next-object)
         (define-key tads3-mode-map "\M-p" 'tads3-prev-object)
         (define-key tads3-mode-map "{" 'electric-tads3-brace)
-        (define-key tads3-mode-map "}" 'electric-tads3-brace)
         (define-key tads3-mode-map ";" 'electric-tads3-semi)
         (define-key tads3-mode-map "#" 'electric-tads3-sharp-sign)
         (define-key tads3-mode-map "*" 'electric-tads3-splat)
@@ -193,7 +192,8 @@ RETURN is pressed.")
 ;; I don't know how to fix the original version which also inserts newlines
 ;; before and after the braces when enabled. - AP
 (defvar tads3-auto-newline t
-    "*If t, automatically add after semicolons in TADS code.")
+    "*If t, automatically add after semicolons and before braces that
+are on the same line as other code in TADS code.")
 
 
 ;;; Syntax variables: ---------------------------------------------------------
@@ -346,7 +346,7 @@ RETURN is pressed.")
         (optional (seq "E" (or "+" "-") (one-or-more digit)))
         symbol-end))
 
-(defconst tads3-description-regexp "\"[^\"]*\"?+")
+(defconst tads3-description-regexp (rx "\"" (zero-or-more (or "\\\"" (not (any "\"")))) (opt "\"")))
 (defconst tads3-substitution-regexp "<<[^>]*\\(?:>>\\)?+")
 (defconst tads3-string-regexp (rx "'" (zero-or-more (or "\\'" (not (any "'" "\n" "\r")))) "'"))
 
@@ -568,7 +568,7 @@ RETURN is pressed.")
                           (1+ (current-column)))
                     ((or (looking-at "^#[ \t]*endif[ \t]*")
                          (looking-at "^#[ \t]*else[ \t]*"))
-                        7)			;2 spaces after #endif
+                        7)              ;2 spaces after #endif
                     ((progn
                          (goto-char opoint)
                          (skip-chars-backward " \t")
@@ -577,7 +577,7 @@ RETURN is pressed.")
                         ;; before the comment, align it at 0 rather than 1.
                         0)
                     (t
-                        (max (1+ (current-column))   ;Else indent at comment column
+                        (max (1+ (current-column)) ;Else indent at comment column
                             comment-column)))))))   ; except leave at least one space.
 
 (defun tads3-indent-command (&optional whole-exp)
@@ -1355,29 +1355,27 @@ With a negative prefix arg, go forwards."
     (and (looking-at tads3-defun-regexp)
         (not (looking-at "[ \t]*default[ \t]*:"))))
 
-
+
 ;;; Electric commands: --------------------------------------------------------
 
 (defun electric-tads3-brace (arg)
     "Insert character and correct line's indentation."
     (interactive "P")
     (let (insertpos)
-        (if (and (not arg)
-                (eolp)
-                (or (save-excursion
-                        (skip-chars-backward " \t")
-                        (bolp))))
+        (if (and tads3-auto-newline
+                (not (save-excursion
+                         (skip-chars-backward " \t")
+                         (bolp))))
             (progn
-                (insert last-command-event)
                 (tads3-indent-line)
-                (save-excursion
-                    (if insertpos (goto-char (1+ insertpos)))
-                    (delete-char -1))))
-        (if insertpos
-            (save-excursion
-                (goto-char insertpos)
-                (self-insert-command (prefix-numeric-value arg)))
-            (self-insert-command (prefix-numeric-value arg)))))
+                (newline)))
+        (self-insert-command (prefix-numeric-value arg))
+        (tads3-indent-line)
+        (newline)
+        (save-excursion
+            (newline)
+            (tads3-indent-line))
+        (tads3-indent-line)))
 
 (defun electric-tads3-splat (arg)
     "Insert character and correct line's indentation, if in a comment."
