@@ -267,7 +267,7 @@ are on the same line as other code in TADS code.")
     ;; (MODIFIED BY AP)
     ;; Class is a keyword. That was somehow missed.
     (defvar tads3-keywords-regexp
-        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|for\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|true\\|while\\|static\\)\\>"
+        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\|ase\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|for\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|true\\|while\\|static\\)\\>"
         "Regular expression matching a TADS reserved word"))
 
 ;; A note: tads3-label-regexp and tads3-modified-regexp will NOT match
@@ -397,14 +397,14 @@ are on the same line as other code in TADS code.")
              ("^[ \t]*modify \\(\\w+\\)"
                  1 'font-lock-function-name-face)
 
-             ;; method def or function call
-             ("\\(\\_<[a-zA-Z0-9_]+\\_>\\)(.*)" 1 'font-lock-function-name-face)
-
              ;; TADS keywords.
-             (,(concat "\\(" tads3-keywords-regexp "\\)") . 'font-lock-keyword-face)
+             (,(concat "\\(" tads3-keywords-regexp "\\)") 0 'font-lock-keyword-face)
 
              ;; TADS functions.
              (,(concat "\\(" tads3-functions-regexp "\\)") . 'font-lock-builtin-face)
+
+             ;; method def or function call
+             ("\\(\\_<[a-zA-Z0-9_]+\\_>\\)(.*)" 1 'font-lock-function-name-face)
 
              ;; TADS class names.
              (,tads3-class-name-regexp . 'font-lock-type-face)
@@ -733,8 +733,10 @@ level rather than being C-style code in a function body."
             ;; Now we've got some info, figure out what's up
             ;; State is: (paren-depth inner-list-start last-sexp instring incomment
             ;;            after-quote min-paren-depth)
-            (cond ((or (nth 3 state) (nth 4 state))
-                      (nth 4 state))		; Comment or string
+            (cond
+                ((or (nth 3 state) (nth 4 state))
+                    ;; Comment or string
+                    (nth 4 state))
                 ((null containing-sexp)
                     ;; We're at the top level.
                     (goto-char indent-point)
@@ -755,7 +757,7 @@ level rather than being C-style code in a function body."
                             ;; check for start of function def (already checked
                             ;; if we're a continued property def)
                             ((= next-char ?{)
-                                0)			; start of function body
+                                (current-indentation))			; start of function body
                             ((and (= (current-indentation) 0)
                                  (memq (preceding-char) '(?\; ?})))
                                 ;; just after obj def or func def
