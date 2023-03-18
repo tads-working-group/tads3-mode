@@ -24,13 +24,6 @@ tads2-mode.el to support TADS 3.
 - Clearer specification of what something is in the imenu list of objects,
   functions, modifications, etc.
 
-## New Problems:
-- Currently, braces on a newline after a method definition are not properly
-  indented
-- I had to remove the feature of automatically adding newlines *before* braces
-  for those who prefer that, since the feature was very buggy and I'm new to
-  writing Emacs plugins
-
 ## Old Problems
 - Multiline C-style comments like:
    /* This
@@ -42,11 +35,25 @@ be difficult.
 something nonsense later on.
 - You cannot move to sub-objects via tads-next-object.
 
-It is VERY strongly recommended that swapq-fill.el is used in
-conjunction with this mode, to assist in single quote filling.
-
 ## Screenshots
 
 ![](./screenshot1.png)
 ![](./screenshot2.png)
 ![](./screenshot3.png)
+
+## Installation
+
+Installation is simple. `git clone` this repository somewhere in your load path
+(somewhere under `~/.emacs.d/`) or add wherever you put it to your load path,
+and then add this code to your configuration file (`init.el`, `config.el` under
+DOOM, etc.):
+
+```emacs-lisp
+(autoload 'tads3-mode "tads3" "TADS 3 editing mode." t)
+(setq auto-mode-alist
+      (append (list (cons "\\.t$" 'tads3-mode))
+              auto-mode-alist))
+```
+
+It's recommended that you also use a soft word wrap mode like `+word-wrap-mode`
+with this plugin, since you'll be writing lots of long lines of text.

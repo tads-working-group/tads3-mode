@@ -1,4 +1,4 @@
-;;; tads3-mode.el --- TADS 2/3 mode for GNU Emacs v24 or later
+;;; tads3-mode.el --- TADS 2/3 mode for GNU Emacs v24.3 or later
 
 ;;;;;;;;;;;
 ;; This version was modified by Brett Witty <brettwitty@brettwitty.net>
@@ -22,11 +22,13 @@
 ;; conjunction with this mode, to assist in single quote filling.
 ;;;;;;;;;;;
 
-;; Co-Author: Aleixs Purslane <alexispurslane@pm.me>
+;; Author: Alexis Purslane <alexispurslane@pm.me>
 ;; Modified 17 Mar 2023
 ;; Version 1.4
-;; Keywords: languages
+;; Package-Requires: ((emacs "24.3"))
+;; Keywords: languages, tads, text-adventure, interactive-fiction
 
+;; Previous version:
 ;; Author: Brett Witty <brettwitty@brettwitty.net>
 ;; Modified: 4 Feb 2006
 ;; Version: 1.3
@@ -63,6 +65,19 @@
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;; General Public License for more details.
 
+;;; Commentary for version 1.4:
+
+;; This version has been further improved for TADS 3, including more syntax
+;; highlighting for various constructions such as function calls, properties,
+;; classes, and so on, as well as adding in many keywords that were forgotten
+;; the first time around. Additionally, the plugin has been updated to be
+;; compatible with Emacs versions past 24, and updated to use more modern Emacs
+;; Lisp constructions that were introduced after that version as well. On top of
+;; that, several bugfixes have been provided.
+;;
+;; Thanks to Brett Witty for making the plugin this is based off! I would have
+;; never had the courage to start on my own.
+
 ;;; Commentary for version 1.3:
 
 ;; This version is a modification on the original TADS 2 mode. It can
@@ -87,14 +102,6 @@
 ;; early versions of this mode, and to Dan Schmidt, who got filled
 ;; strings and imenu support working.
 ;;
-
-;; Put this file somewhere on your load-path, and the following code in
-;; your .emacs file:
-;;
-;;  (autoload 'tads3-mode "tads3" "TADS 3 editing mode." t)
-;;  (setq auto-mode-alist
-;;        (append (list (cons "\\.t$" 'tads3-mode))
-;;                auto-mode-alist))
 
 ;;; Code:
 
@@ -350,6 +357,9 @@ are on the same line as other code in TADS code.")
 (defconst tads3-substitution-regexp "<<[^>]*\\(?:>>\\)?+")
 (defconst tads3-string-regexp (rx "'" (zero-or-more (or "\\'" (not (any "'" "\n" "\r")))) "'"))
 
+(defconst tads3-method-def-regexp "[\t ]+\\(\\_<[a-zA-Z0-9_]+\\_>\\)(.*)\\(?:\s*{\\)?$")
+(defconst tads3-function-call-regexp "\\(?:;\\)?[\t \r]*\\(\\_<[a-zA-Z0-9_]+\\_>\\)([^);]*)\s*;")
+
 ;;; Font-lock keywords: -------------------------------------------------------
 
 (defvar tads3-font-lock-defaults
@@ -404,7 +414,8 @@ are on the same line as other code in TADS code.")
              (,(concat "\\(" tads3-functions-regexp "\\)") . 'font-lock-builtin-face)
 
              ;; method def or function call
-             ("\\(\\_<[a-zA-Z0-9_]+\\_>\\)(.*)" 1 'font-lock-function-name-face)
+             (,tads3-function-call-regexp 1 'font-lock-function-name-face)
+             (,tads3-method-def-regexp 1 'font-lock-function-name-face)
 
              ;; TADS class names.
              (,tads3-class-name-regexp . 'font-lock-type-face)
@@ -531,25 +542,25 @@ are on the same line as other code in TADS code.")
     (setq local-abbrev-table tads3-mode-abbrev-table)
     (set-syntax-table tads3-mode-syntax-table)
 
-    (set (make-local-variable 'paragraph-start) (concat "^$\\|" page-delimiter))
-    (set (make-local-variable 'paragraph-separate) paragraph-start)
-    (set (make-local-variable 'paragraph-ignore-fill-prefix) t)
-    (set (make-local-variable 'indent-line-function) 'tads3-indent-line)
-    (set (make-local-variable 'indent-region-function) 'tads3-indent-region)
-    (set (make-local-variable 'fill-paragraph-function) 'tads3-fill-paragraph)
-    (set (make-local-variable 'imenu-extract-index-name-function)
-        'tads3-imenu-extract-name)
-    (set (make-local-variable 'imenu-prev-index-position-function)
+    (setq-local paragraph-start (concat "^$\\|" page-delimiter))
+    (setq-local paragraph-separate paragraph-start)
+    (setq-local paragraph-ignore-fill-prefix t)
+    (setq-local indent-line-function 'tads3-indent-line)
+    (setq-local indent-region-function 'tads3-indent-region)
+    (setq-local fill-paragraph-function 'tads3-fill-paragraph)
+    (setq-local imenu-generic-expression
+        tads3-imenu-generic-expression-regexp)
+    (setq-local imenu-prev-index-position-function
         'tads3-prev-object)
-    (set (make-local-variable 'require-final-newline) t)
+    (setq-local require-final-newline t)
     ;; The block mode comments are default
-    (set (make-local-variable 'comment-start) "/* ")
-    (set (make-local-variable 'comment-end) " */")
-    (set (make-local-variable 'comment-column) 40)
-    (set (make-local-variable 'comment-start-skip) "/\\*+ *\\|// *")
-    (set (make-local-variable 'comment-indent-function) 'tads3-comment-indent)
-    (set (make-local-variable 'parse-sexp-ignore-comments) t)
-    (set (make-local-variable 'font-lock-defaults) tads3-font-lock-defaults)
+    (setq-local comment-start "/* ")
+    (setq-local comment-end " */")
+    (setq-local comment-column 40)
+    (setq-local comment-start-skip "/\\*+ *\\|// *")
+    (setq-local comment-indent-function 'tads3-comment-indent)
+    (setq-local parse-sexp-ignore-comments t)
+    (setq-local font-lock-defaults tads3-font-lock-defaults)
     (run-hooks 'tads3-mode-hook))
 
 ;; This is used by indent-for-comment
@@ -1310,21 +1321,30 @@ With a negative prefix arg, go forwards."
     (interactive "P")
     (tads3-next-object (- (prefix-numeric-value arg))))
 
+(defvar tads3-imenu-generic-expression-regexp
+    (list
+        (list (purecopy "Functions") (purecopy "^\\(\\w+\\)\\s-*:\\s-*function\\(;\\)?") 1)
+        (list (purecopy "Properties") (purecopy "^[\t ]+\\(\\_<[a-z_][a-zA-Z0-9_]*\\_>\\) = ") 1)
+        (list (purecopy "Methods") (purecopy tads3-method-def-regexp) 1)
+        (list (purecopy "Objects") (purecopy "^\\(\\w+\\)\\s-*:") 1)
+        (list (purecopy "Modifications") (purecopy "^\\(modify\\|replace\\)\\s-+\\(\\w+\\)") 2)
+        (list (purecopy "Classes") (purecopy "^class\\s-+\\(\\w+\\)\\s-*:") 1)))
+
 (defun tads3-imenu-extract-name ()
     (cond
         ((looking-at "^\\(\\w+\\)\\s-*:\\s-*function\\(;\\)?")
-              (if (not (match-string 2)) ; If it's a forward declaration, don't bite
-                  (concat "Function "
-                      (buffer-substring-no-properties (match-beginning 1)
-                          (match-end 1)))))
+            (if (not (match-string 2)) ; If it's a forward declaration, don't bite
+                (concat "Function "
+                    (buffer-substring-no-properties (match-beginning 1)
+                        (match-end 1)))))
         ((looking-at "^\\(\\w+\\)\\s-*:")
             (concat "Object "
                 (buffer-substring-no-properties (match-beginning 1)
                     (match-end 1))))
-        ((looking-at "^\\(modify\\|replace\\)\\s-+\\(\\w+\\)")
+        ((looking-at )
             (concat "Modification "
                 (buffer-substring-no-properties (match-beginning 2)
-                        (match-end 2))))
+                    (match-end 2))))
         ((looking-at "^class\\s-+\\(\\w+\\)\\s-*:")
             (concat "Class "
                 (buffer-substring-no-properties (match-beginning 1)
