@@ -27,20 +27,20 @@ tads2-mode.el to support TADS 3.
 ## Roadmap
 
 ### To finish v1.4
--[ ] Compilation, Error-checking and jump-to-error
--[ ] Add source file to t3m
--[ ] Running the game in editor and refreshing it on build
--[ ] Running test scripts
--[ ] Spellcheck that knows how to deal with TADS text
--[ ] Word count that understands TADS text
--[ ] Strings viewer (the compiler can output all strings)
--[ ] Uploading the plugin to MELPA
+- [ ] Compilation, Error-checking and jump-to-error
+- [ ] Add source file to t3m
+- [ ] Running the game in editor and refreshing it on build
+- [ ] Running test scripts
+- [ ] Spellcheck that knows how to deal with TADS text
+- [ ] Word count that understands TADS text
+- [ ] Strings viewer (the compiler can output all strings)
+- [ ] Uploading the plugin to MELPA
 
 ### For 2.0
 
--[ ] Autocompletetion
--[ ] Refactoring tools
--[ ] Documentation for thing at point
+- [ ] Autocompletetion
+- [ ] Refactoring tools
+- [ ] Documentation for thing at point
 
 ## Old Problems
 - Multiline C-style comments like:
