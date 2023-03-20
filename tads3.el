@@ -1,4 +1,4 @@
-;;; tads3-mode.el --- TADS 2/3 mode for GNU Emacs v24.3 or later
+;;; tads3-mode.el --- TADS 3 mode for GNU Emacs v28.1
 
 ;;;;;;;;;;;
 ;; This version was modified by Brett Witty <brettwitty@brettwitty.net>
@@ -25,7 +25,7 @@
 ;; Author: Alexis Purslane <alexispurslane@pm.me>
 ;; Modified 17 Mar 2023
 ;; Version 1.4
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "28.1"))
 ;; Keywords: languages, tads, text-adventure, interactive-fiction
 
 ;; Previous version:
@@ -42,7 +42,7 @@
 
 ;; LCD Archive Entry:
 ;; tads3-mode|Brett Witty|brettwitty@brettwitty.net|
-;; Major mode for editing TADS 2/3 programs|
+;; Major mode for editing TADS 3/3 programs|
 ;; 4-Feb-2006|1.3|~/modes/tads3-mode.el.Z|
 
 ;;; Copyright:
@@ -80,9 +80,9 @@
 
 ;;; Commentary for version 1.3:
 
-;; This version is a modification on the original TADS 2 mode. It can
-;; be used for both TADS 2 and 3.
-;; TADS 2 can be found at http://www.ifarchive.org/indexes/if-archiveXprogrammingXtads2.html
+;; This version is a modification on the original TADS 3 mode. It can
+;; be used for both TADS 3 and 3.
+;; TADS 3 can be found at http://www.ifarchive.org/indexes/if-archiveXprogrammingXtads2.html
 ;; TADS 3 can be found at http://www.ifarchive.org/indexes/if-archiveXprogrammingXtads3.html
 ;;
 ;; Thanks to Stephen Granade for the original version, and all those
@@ -105,13 +105,15 @@
 
 ;;; Code:
 
+(eval-when-compile
+    (require 'rx))
 
 ;;; General variables: --------------------------------------------------------
 
-(defconst tads3-mode-version "1.3")
+(defconst tads3-mode-version "1.4")
 
 (defvar tads3-startup-message t
-    "*Non-nil means display a message when TADS 2 mode is loaded.")
+    "*Non-nil means display a message when TADS 3 mode is loaded.")
 
 (defvar tads3-no-c++-comments nil
     "*If t, C++-style comments \(//\) are not fontified or treated as comments.")
@@ -122,34 +124,30 @@
 (defvar tads3-mode-abbrev-table nil)
 
 (defvar tads3-mode-map nil
-    "Keymap used in TADS 2 mode.")
+    "Keymap used in TADS 3 mode.")
 
 (if tads3-mode-map nil
-    (let ((map (make-sparse-keymap "TADS")))
-        (setq tads3-mode-map (make-sparse-keymap))
-        (define-key tads3-mode-map "\M-n" 'tads3-next-object)
-        (define-key tads3-mode-map "\M-p" 'tads3-prev-object)
-        (define-key tads3-mode-map "{" 'electric-tads3-brace)
-        (define-key tads3-mode-map ";" 'electric-tads3-semi)
-        (define-key tads3-mode-map "#" 'electric-tads3-sharp-sign)
-        (define-key tads3-mode-map "*" 'electric-tads3-splat)
-        (define-key tads3-mode-map "\r" 'electric-tads3-enter)
-        (define-key tads3-mode-map "\M-t" 'tads3-inside-block-comment)
-        ;; REMOVED BY BW because of problemaatic behaviour. Uncomment it if you like.
-                                        ;(define-key tads3-mode-map "\177" 'backward-delete-char-untabify)
-        (define-key tads3-mode-map "\t" 'tads3-indent-command)
-        (define-key tads3-mode-map [menu-bar] (make-sparse-keymap))
-        (define-key tads3-mode-map [menu-bar tads] (cons "TADS" map))
-        (define-key map [next-object] '("Next object" . tads3-next-object))
-        (define-key map [prev-object] '("Previous object" . tads3-prev-object))
-        (define-key map [separator1] '("--" . nil))
-        (define-key map [comment-region] '("Comment Out Region" . comment-region))
-        (put 'comment-region 'menu-enable 'mark-active)
-        (define-key map [indent-region] '("Indent Region" . indent-region))
-        (put 'indent-region 'menu-enable 'mark-active)
-        (define-key map [indent-line] '("Indent Line" . indent-for-tab-command))))
+    (setq tads3-mode-map (make-sparse-keymap))
 
-
+    ;; major mode commands
+    (define-key tads3-mode-map (kbd "M-n") 'tads3-next-object)
+    (define-key tads3-mode-map (kbd "M-p") 'tads3-prev-object)
+    (define-key tads3-mode-map (kbd "M-t") 'tads3-inside-block-comment)
+    (define-key tads3-mode-map (kbd "C-c C-c") 'tads3-build)
+    (define-key tads3-mode-map (kbd "<f5>") 'tads3-build)
+
+    ;; Electric keys
+    (define-key tads3-mode-map "{" 'electric-tads3-brace)
+    (define-key tads3-mode-map ";" 'electric-tads3-semi)
+    (define-key tads3-mode-map "#" 'electric-tads3-sharp-sign)
+    (define-key tads3-mode-map "*" 'electric-tads3-splat)
+    (define-key tads3-mode-map "\t" 'tads3-indent-command)
+    (define-key tads3-mode-map "\r" 'electric-tads3-enter))
+
+(defvar tads3-install-path
+    "/usr/local/bin/"
+    "The location where the frob interpreter and the TADS 3 compiler reside.")
+
 ;;; Indentation parameters: ---------------------------------------------------
 
 (defvar tads3-indent-level 4
@@ -274,7 +272,7 @@ are on the same line as other code in TADS code.")
     ;; (MODIFIED BY AP)
     ;; Class is a keyword. That was somehow missed.
     (defvar tads3-keywords-regexp
-        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\|ase\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|for\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|true\\|while\\|static\\)\\>"
+        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\|ase\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|f\\(or\\|unction\\)\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|true\\|while\\|static\\)\\>"
         "Regular expression matching a TADS reserved word"))
 
 ;; A note: tads3-label-regexp and tads3-modified-regexp will NOT match
@@ -533,7 +531,7 @@ are on the same line as other code in TADS code.")
     If true, automatically add newlines after semicolons in TADS code."
     (interactive)
     (if tads3-startup-message
-        (message "Emacs TADS mode version %s by Stephen Granade."
+        (message "Emacs TADS mode version %s by Alexis Purslane, Brett W, and Stephen Granade."
             tads3-mode-version))
     (kill-all-local-variables)
     (use-local-map tads3-mode-map)
@@ -1280,6 +1278,45 @@ preserving the comment indentation or line-starting decorations."
 
 ;;; Miscellaneous: ------------------------------------------------------------
 
+(defun tads3-make-project (makefile)
+    "Builds the .t3m file given by MAKEFILE for a project.
+
+Since the makefile name/path is the same as the project name, uses that as the project name as well."
+    (let ((comp-buffer-name (concat "*compilation*<" makefile ">")))
+        (if (get-buffer comp-buffer-name)
+            (progn
+                (delete-windows-on (get-buffer comp-buffer-name))
+                (kill-buffer comp-buffer-name)))
+        (compile (concat tads3-install-path "t3make -d -f " makefile))))
+
+(defun tads3-file-search-upward (start-dir extension)
+    "Search START-DIR for file with EXTENSION and return its path if found, or NIL.
+
+If FILE is not found in DIR, the parent of DIR will be searched,
+and so on."
+    (named-let rec ((dir start-dir))
+        (let* ((regex (rx (1+ print) (literal extension)))
+               (file (car (-filter
+                              (apply-partially 'string-match-p regex)
+                              (directory-files dir)))))
+            (cond
+                ;; We found the file
+                (file
+                    file)
+                ;; We've gotten to the home directory, no need to search further
+                ((or (string= dir "/") (string= dir (expand-file-name "~")))
+                    nil)
+                ;; Search in the parent directory!
+                (t
+                    (rec (file-name-directory (directory-file-name dir))))))))
+
+(defun tads3-build ()
+    "Builds the current project using its .t3m file.
+
+Finds the .t3m file in the current directory, or a parent directory."
+    (interactive)
+    (tads3-make-project (tads3-file-search-upward default-directory ".t3m")))
+
 (defun tads3-next-object (&optional arg)
     "Go to the next object or class declaration in the file.
 With a prefix arg, go forward that many declarations.
@@ -1291,7 +1328,7 @@ With a negative prefix arg, search backwards."
               (forward-or-backward (if (< n 0) -1 1))
               (additional-n (if (and (tads3-looking-at-defun)
                                     (not (< n 0))) 1 0))
-              success                         ; did re-search-forward actually work?
+              success                   ; did re-search-forward actually work?
               flag)
         (if (< n 0)
             (setq fun 're-search-backward errstring "previous" n (- n)))
