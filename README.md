@@ -1,6 +1,6 @@
 # tads3-mode
 
-This TADS 3 emacs mode was modified by Alexis Purslane <alexispurslane@pm.me>
+This TADS 3 Emacs mode was modified by Alexis Purslane <alexispurslane@pm.me>
 from Brett Witty <brettwitty@brettwitty.net>'s modification of Stephen Granade's
 tads2-mode.el to support TADS 3.
 
@@ -26,7 +26,7 @@ This version of the plugin requires Emacs 28.1 (the latest, currently) or later.
 - Clearer specification of what something is in the imenu list of objects,
   functions, modifications, etc.
 - Updated code for modern Emacs Lisp
-- An in-edtior build system that lets you compile the project the current file
+- An in-editor build system that lets you compile the project the current file
   belongs to, even if the project root is in a parent directory, with a single
   key combination, and puts the output of the compiler in a split window where
   you can click on errors to jump to them in your code.
@@ -79,7 +79,10 @@ with this plugin, since you'll be writing lots of long lines of text.
 
 ## Screenshots
 
-![](./screenshot1.png)
-![](./screenshot2.png)
-![](./screenshot3.png)
-![](./screenshot4.png)
+![A screenshot showing syntax highlighting for methods, if statements,
+properties, and so on](./screenshot1.png)
+![A screenshot showcasing string substitution syntax highlighting](./screenshot2.png)
+![A screenshot showing double quoted strings and double quoted string substitution](./screenshot3.png)
+![A screenshot showing the compliation window with a clickable error](./screenshot4.png)
+![A screenshot showing the imenu jump to object/method/function/class/property
+definition fuzzy popup](./screenshot5.png)
