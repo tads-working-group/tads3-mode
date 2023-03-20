@@ -4,6 +4,8 @@ This TADS 3 emacs mode was modified by Alexis Purslane <alexispurslane@pm.me>
 from Brett Witty <brettwitty@brettwitty.net>'s modification of Stephen Granade's
 tads2-mode.el to support TADS 3.
 
+This version of the plugin requires Emacs 28.1 (the latest, currently) or later.
+
 ## Changes my version adds:
 
 - syntax highlighting for properties when they're being accessed using dot
@@ -16,18 +18,23 @@ tads2-mode.el to support TADS 3.
 - syntax highlighting for substitutions inside strings (only inside the strings,
   too, using Emacs' anchored highlighters) and are a different font (italic sans
   serif)
-- syntax higlighting for class names (just based on whether it's an identifier
+- syntax highlighting for class names (just based on whether it's an identifier
   that starts with an uppercase letter)
 - syntax highlighting for numbers
 - Some updates to make it compatible with versions of Emacs since v24 (it was
   erroring out)
 - Clearer specification of what something is in the imenu list of objects,
   functions, modifications, etc.
+- Updated code for modern Emacs Lisp
+- An in-edtior build system that lets you compile the project the current file
+  belongs to, even if the project root is in a parent directory, with a single
+  key combination, and puts the output of the compiler in a split window where
+  you can click on errors to jump to them in your code.
 
 ## Roadmap
 
 ### To finish v1.4
-- [ ] Compilation, Error-checking and jump-to-error
+- [x] Compilation, Error-checking and jump-to-error
 - [ ] Add source file to t3m
 - [ ] Running the game in editor and refreshing it on build
 - [ ] Running test scripts
@@ -53,12 +60,6 @@ be difficult.
 something nonsense later on.
 - You cannot move to sub-objects via tads-next-object.
 
-## Screenshots
-
-![](./screenshot1.png)
-![](./screenshot2.png)
-![](./screenshot3.png)
-
 ## Installation
 
 Installation is simple. `git clone` this repository somewhere in your load path
@@ -75,3 +76,10 @@ DOOM, etc.):
 
 It's recommended that you also use a soft word wrap mode like `+word-wrap-mode`
 with this plugin, since you'll be writing lots of long lines of text.
+
+## Screenshots
+
+![](./screenshot1.png)
+![](./screenshot2.png)
+![](./screenshot3.png)
+![](./screenshot4.png)
