@@ -134,7 +134,9 @@
     (define-key tads3-mode-map (kbd "M-p") 'tads3-prev-object)
     (define-key tads3-mode-map (kbd "M-t") 'tads3-inside-block-comment)
     (define-key tads3-mode-map (kbd "C-c C-c") 'tads3-build)
+    (define-key tads3-mode-map (kbd "C-c C-1") 'tads3-run)
     (define-key tads3-mode-map (kbd "<f5>") 'tads3-build)
+    (define-key tads3-mode-map (kbd "<f4>") 'tads3-run)
 
     ;; Electric keys
     (define-key tads3-mode-map "{" 'electric-tads3-brace)
@@ -147,6 +149,12 @@
 (defvar tads3-install-path
     "/usr/local/bin/"
     "The location where the frob interpreter and the TADS 3 compiler reside.")
+
+(defvar tads3-interpreter
+    "/usr/local/bin/qtads"
+    "The executable for tads3-mode to launch when you run your game.
+
+QTADS is recommended for full freature support, but frobTADS and Gargoyle will also work if you are writing a text only game.")
 
 ;;; Indentation parameters: ---------------------------------------------------
 
@@ -272,7 +280,7 @@ are on the same line as other code in TADS code.")
     ;; (MODIFIED BY AP)
     ;; Class is a keyword. That was somehow missed.
     (defvar tads3-keywords-regexp
-        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\|ase\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|f\\(or\\|unction\\)\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|true\\|while\\|static\\)\\>"
+        "\\<\\(a\\(bort\\|rgcount\\)\\|break\\|c\\(ontinue\\|lass\\|ase\\)\\|d\\(elete\\|o\\)\\|e\\(lse\\|num\\|xit\\(\\|obj\\)\\)\\|f\\(or\\|unction\\)\\|goto\\|i\\(f\\|nherited\\)\\|local\\|modify\\|n\\(ew\\|il\\)\\|pass\\|re\\(place\\|turn\\)\\|s\\(elf\\|witch\\)\\|t\\(rue\\|ry\\|emplate\\)\\|while\\|static\\|finally\\)\\>"
         "Regular expression matching a TADS reserved word"))
 
 ;; A note: tads3-label-regexp and tads3-modified-regexp will NOT match
@@ -355,7 +363,7 @@ are on the same line as other code in TADS code.")
 (defconst tads3-substitution-regexp "<<[^>]*\\(?:>>\\)?+")
 (defconst tads3-string-regexp (rx "'" (zero-or-more (or "\\'" (not (any "'" "\n" "\r")))) "'"))
 
-(defconst tads3-method-def-regexp "[\t ]+\\(\\_<[a-zA-Z0-9_]+\\_>\\)(.*)\\(?:\s*{\\)?$")
+(defconst tads3-method-def-regexp "[\t ]*\\(\\_<[a-zA-Z0-9_]+\\_>\\)\\(?:(.*)\\)?\\(?:[\n\t ]*{\\)$")
 (defconst tads3-function-call-regexp "\\(?:;\\)?[\t \r]*\\(\\_<[a-zA-Z0-9_]+\\_>\\)([^);]*)\s*;")
 
 ;;; Font-lock keywords: -------------------------------------------------------
@@ -370,7 +378,7 @@ are on the same line as other code in TADS code.")
   :group 'faces)
 
 (defface tads3-description-face
-  '((t . (:inherit font-lock-string-face :weight bold :foreground "#004D99")))
+  '((t . (:inherit font-lock-string-face :weight bold :foreground "#5FAFFF")))
   "Face for Inform 7 strings."
   :group 'tads3-faces)
 
@@ -1283,10 +1291,9 @@ preserving the comment indentation or line-starting decorations."
 
 Since the makefile name/path is the same as the project name, uses that as the project name as well."
     (let ((comp-buffer-name (concat "*compilation*<" makefile ">")))
-        (if (get-buffer comp-buffer-name)
-            (progn
-                (delete-windows-on (get-buffer comp-buffer-name))
-                (kill-buffer comp-buffer-name)))
+        (when (get-buffer comp-buffer-name)
+            (delete-windows-on (get-buffer comp-buffer-name))
+            (kill-buffer comp-buffer-name))
         (compile (concat tads3-install-path "t3make -d -f " makefile))))
 
 (defun tads3-file-search-upward (start-dir extension)
@@ -1295,14 +1302,14 @@ Since the makefile name/path is the same as the project name, uses that as the p
 If FILE is not found in DIR, the parent of DIR will be searched,
 and so on."
     (named-let rec ((dir start-dir))
-        (let* ((regex (rx (1+ print) (literal extension)))
+        (let* ((regex (rx (1+ print) (literal extension) (or eol eos)))
                (file (car (-filter
                               (apply-partially 'string-match-p regex)
                               (directory-files dir)))))
             (cond
                 ;; We found the file
                 (file
-                    file)
+                    (concat dir file))
                 ;; We've gotten to the home directory, no need to search further
                 ((or (string= dir "/") (string= dir (expand-file-name "~")))
                     nil)
@@ -1316,6 +1323,19 @@ and so on."
 Finds the .t3m file in the current directory, or a parent directory."
     (interactive)
     (tads3-make-project (tads3-file-search-upward default-directory ".t3m")))
+
+(defvar *tads3-interpreter-process* nil
+    "Holds the current running interpreter process.")
+
+(defun tads3-run ()
+    "Build and run the project's .t3 game file in the provided interpreter."
+    (interactive)
+    (let* ((game-file (tads3-file-search-upward default-directory ".t3"))
+           (game-buffer-name (concat "*interpreter*<" game-file ">")))
+        (when *tads3-interpreter-process*
+            (delete-process *tads3-interpreter-process*)
+            (setq *tads3-interpreter-process* nil))
+        (setq *tads3-interpreter-process* (start-process tads3-interpreter game-buffer-name tads3-interpreter game-file))))
 
 (defun tads3-next-object (&optional arg)
     "Go to the next object or class declaration in the file.
@@ -1361,9 +1381,9 @@ With a negative prefix arg, go forwards."
 (defvar tads3-imenu-generic-expression-regexp
     (list
         (list (purecopy "Functions") (purecopy "^\\(\\w+\\)\\s-*:\\s-*function\\(;\\)?") 1)
-        (list (purecopy "Properties") (purecopy "^[\t ]+\\(\\_<[a-z_][a-zA-Z0-9_]*\\_>\\) = ") 1)
         (list (purecopy "Methods") (purecopy tads3-method-def-regexp) 1)
         (list (purecopy "Objects") (purecopy "^\\(\\w+\\)\\s-*:") 1)
+        (list (purecopy "Contained Objects") (purecopy "^\\++\s*\\(\\w+\\)\\s-*:") 1)
         (list (purecopy "Modifications") (purecopy "^\\(modify\\|replace\\)\\s-+\\(\\w+\\)") 2)
         (list (purecopy "Classes") (purecopy "^class\\s-+\\(\\w+\\)\\s-*:") 1)))
 
