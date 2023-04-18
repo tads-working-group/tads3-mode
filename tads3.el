@@ -208,6 +208,9 @@ RETURN is pressed.")
     "*If t, automatically add after semicolons and before braces that
 are on the same line as other code in TADS code.")
 
+(defvar tads3--locate-t3m-regexp "\\.t3m$"
+  "*Regexp for locating t3make files in parent directories.")
+
 
 ;;; Syntax variables: ---------------------------------------------------------
 
@@ -1296,33 +1299,36 @@ Since the makefile name/path is the same as the project name, uses that as the p
             (kill-buffer comp-buffer-name))
         (compile (concat tads3-install-path "t3make -d -f " makefile))))
 
-(defun tads3-file-search-upward (start-dir extension)
-    "Search START-DIR for file with EXTENSION and return its path if found, or NIL.
+;; We assume multiple t3make files, in case there is a webui version and a standard.
+(defun tads3-locate-t3m ()
+  "Return a list of t3make files in this directory, or the first parent directory that contains any. "
+  (let* ((this-dir (file-name-directory (buffer-file-name)))
+         (t3m-dir (locate-dominating-file this-dir (lambda (dir) (directory-files dir nil tads3--locate-t3m-regexp t))))
+         (t3m-files (directory-files t3m-dir nil tads3--locate-t3m-regexp t)))
+    (if (null t3m-files)
+        (error "No t3m files found")
+      (mapcar (lambda (file) (file-name-concat t3m-dir file) ) t3m-files))))
 
-If FILE is not found in DIR, the parent of DIR will be searched,
-and so on."
-    (named-let rec ((dir start-dir))
-        (let* ((regex (rx (1+ print) (literal extension) (or eol eos)))
-               (file (car (-filter
-                              (apply-partially 'string-match-p regex)
-                              (directory-files dir)))))
-            (cond
-                ;; We found the file
-                (file
-                    (concat dir file))
-                ;; We've gotten to the home directory, no need to search further
-                ((or (string= dir "/") (string= dir (expand-file-name "~")))
-                    nil)
-                ;; Search in the parent directory!
-                (t
-                    (rec (file-name-directory (directory-file-name dir))))))))
+(defun tads3-add-src-file-to-t3m ()
+  "Adds the current file to the project t3make file(s). "
+  (interactive)
+  (let* ((cur-file (buffer-file-name))
+         (cur-file-no-ext (file-name-sans-extension cur-file))
+         (src-line (format "-source %s" (file-name-nondirectory cur-file-no-ext)))
+         (t3m-files (tads3-locate-t3m)))
+    (dolist (t3m t3m-files)
+      (write-region src-line nil t3m 'append))
+    (message "Added %s to %s" cur-file (string-join t3m-files ", "))))
 
 (defun tads3-build ()
     "Builds the current project using its .t3m file.
 
 Finds the .t3m file in the current directory, or a parent directory."
     (interactive)
-    (tads3-make-project (tads3-file-search-upward default-directory ".t3m")))
+    (let ((t3m-files (tads3-locate-t3m)))
+        (tads3-make-project (if (length> t3m-files 1)
+                                (completing-read "Choose t3m files to build: " t3m-files)
+                                (car t3m-files)))))
 
 (defvar *tads3-interpreter-process* nil
     "Holds the current running interpreter process.")
