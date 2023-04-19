@@ -211,6 +211,8 @@ are on the same line as other code in TADS code.")
 (defvar tads3--locate-t3m-regexp "\\.t3m$"
   "*Regexp for locating t3make files in parent directories.")
 
+(defvar tads3--locate-t3-regexp "\\.t3$"
+  "*Regexp for locating t3 game files in parent directories.")
 
 ;;; Syntax variables: ---------------------------------------------------------
 
@@ -1300,11 +1302,12 @@ Since the makefile name/path is the same as the project name, uses that as the p
         (compile (concat tads3-install-path "t3make -d -f " makefile))))
 
 ;; We assume multiple t3make files, in case there is a webui version and a standard.
-(defun tads3-locate-t3m ()
+(defun tads3-locate-file (&optional regex)
   "Return a list of t3make files in this directory, or the first parent directory that contains any. "
-  (let* ((this-dir (file-name-directory (buffer-file-name)))
-         (t3m-dir (locate-dominating-file this-dir (lambda (dir) (directory-files dir nil tads3--locate-t3m-regexp t))))
-         (t3m-files (directory-files t3m-dir nil tads3--locate-t3m-regexp t)))
+  (let* ((file-regex (or regex tads3--locate-t3m-regexp))
+         (this-dir (file-name-directory (buffer-file-name)))
+         (t3m-dir (locate-dominating-file this-dir (lambda (dir) (directory-files dir nil file-regex t))))
+         (t3m-files (directory-files t3m-dir nil file-regex t)))
     (if (null t3m-files)
         (error "No t3m files found")
       (mapcar (lambda (file) (file-name-concat t3m-dir file) ) t3m-files))))
@@ -1315,7 +1318,7 @@ Since the makefile name/path is the same as the project name, uses that as the p
   (let* ((cur-file (buffer-file-name))
          (cur-file-no-ext (file-name-sans-extension cur-file))
          (src-line (format "-source %s" (file-name-nondirectory cur-file-no-ext)))
-         (t3m-files (tads3-locate-t3m)))
+         (t3m-files (tads3-locate-file)))
     (dolist (t3m t3m-files)
       (write-region src-line nil t3m 'append))
     (message "Added %s to %s" cur-file (string-join t3m-files ", "))))
@@ -1325,9 +1328,9 @@ Since the makefile name/path is the same as the project name, uses that as the p
 
 Finds the .t3m file in the current directory, or a parent directory."
     (interactive)
-    (let ((t3m-files (tads3-locate-t3m)))
+    (let ((t3m-files (tads3-locate-file)))
         (tads3-make-project (if (length> t3m-files 1)
-                                (completing-read "Choose t3m files to build: " t3m-files)
+                                (completing-read "Choose t3m file to build: " t3m-files)
                                 (car t3m-files)))))
 
 (defvar *tads3-interpreter-process* nil
@@ -1336,12 +1339,15 @@ Finds the .t3m file in the current directory, or a parent directory."
 (defun tads3-run ()
     "Build and run the project's .t3 game file in the provided interpreter."
     (interactive)
-    (let* ((game-file (tads3-file-search-upward default-directory ".t3"))
+    (let* ((game-files (tads3-locate-file tads3--locate-t3-regexp))
+           (game-file (if (length> game-files 1)
+                          (completing-read "Choose t3 game file to run: " game-files)
+                          (car game-files)))
            (game-buffer-name (concat "*interpreter*<" game-file ">")))
         (when *tads3-interpreter-process*
             (delete-process *tads3-interpreter-process*)
             (setq *tads3-interpreter-process* nil))
-        (setq *tads3-interpreter-process* (start-process tads3-interpreter game-buffer-name tads3-interpreter game-file))))
+        (setq *tads3-interpreter-process* (start-process tads3-interpreter game-buffer-name tads3-interpreter (file-truename game-file)))))
 
 (defun tads3-next-object (&optional arg)
     "Go to the next object or class declaration in the file.
