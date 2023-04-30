@@ -1341,7 +1341,9 @@ keywords, properties, classes, objects, and functions."
                                        (or (equal (cadr item) "property")
                                            (equal (cadr item) "sub-object")
                                            (equal (cadr item) "method"))
-                                       t)))
+                                       (not (or (equal (cadr item) "property")
+                                                (equal (cadr item) "sub-object")
+                                                (equal (cadr item) "method"))))))
                 tads3--company-keywords))))
 
 (defun tads3--company-annotation (candidate)

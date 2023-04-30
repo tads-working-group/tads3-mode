@@ -30,13 +30,17 @@ This version of the plugin requires Emacs 28.1 (the latest, currently) or later.
   belongs to, even if the project root is in a parent directory, with a single
   key combination, and puts the output of the compiler in a split window where
   you can click on errors to jump to them in your code.
+- in-editor running in your interpreter of choice
+- somewhat context-aware autocompletion generated from *all* of your project
+  files and the libraries listed in your *t3m* build file whenever you save a
+  new modification!
 
 ## Roadmap
 
 ### To finish v1.4
 - [x] Compilation, Error-checking and jump-to-error
-- [ ] Add source file to t3m
-- [ ] Running the game in editor and refreshing it on build
+- [x] Add source file to t3m
+- [x] Running the game in editor and refreshing it on build
 - [ ] Running test scripts
 - [ ] Spellcheck that knows how to deal with TADS text
 - [ ] Word count that understands TADS text
@@ -45,7 +49,7 @@ This version of the plugin requires Emacs 28.1 (the latest, currently) or later.
 
 ### For 2.0
 
-- [ ] Autocompletetion
+- [x] Autocompletetion
 - [ ] Refactoring tools
 - [ ] Documentation for thing at point
 
@@ -72,6 +76,9 @@ DOOM, etc.):
 (setq auto-mode-alist
       (append (list (cons "\\.t$" 'tads3-mode))
               auto-mode-alist))
+              
+; necessary for autocompletion to be able to run its script
+(setq-default tads3--install-dir "<path to wherever you've installed this plugin>")
 ```
 
 It's recommended that you also use a soft word wrap mode like `+word-wrap-mode`
@@ -79,10 +86,11 @@ with this plugin, since you'll be writing lots of long lines of text.
 
 ## Screenshots
 
-![A screenshot showing syntax highlighting for methods, if statements,
-properties, and so on](./screenshot1.png)
+![A screenshot showing syntax highlighting for methods, if statements, properties, and so on](./screenshot1.png)
 ![A screenshot showcasing string substitution syntax highlighting](./screenshot2.png)
 ![A screenshot showing double quoted strings and double quoted string substitution](./screenshot3.png)
 ![A screenshot showing the compliation window with a clickable error](./screenshot4.png)
-![A screenshot showing the imenu jump to object/method/function/class/property
-definition fuzzy popup](./screenshot5.png)
+![A screenshot showing the imenu jump to object/method/function/class/property definition fuzzy popup](./screenshot5.png)
+![A screenshot showing autocompletion, where only top-level objects, classes, and functions are suggested when not accessing a property](./screenshot6.png)
+![A screenshot showing autocompletion, where only sub-objects, methods, and properties are suggested when accessing a property](./screenshot7.png)
+![A screenshot showing how autocompletion has general type aware annotations](./screenshot8.png)
