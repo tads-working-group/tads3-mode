@@ -64,6 +64,12 @@ be difficult.
 something nonsense later on.
 - You cannot move to sub-objects via tads-next-object.
 
+## Dependencies
+
+- Emacs 28.1 or newer
+- company-mode
+- the awk language (should come with your OS by default on macOS, BSD, and Linux)
+
 ## Installation
 
 Installation is simple. `git clone` this repository somewhere in your load path
