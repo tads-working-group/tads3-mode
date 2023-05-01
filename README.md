@@ -76,9 +76,6 @@ DOOM, etc.):
 (setq auto-mode-alist
       (append (list (cons "\\.t$" 'tads3-mode))
               auto-mode-alist))
-              
-; necessary for autocompletion to be able to run its script
-(setq-default tads3--install-dir "<path to wherever you've installed this plugin>")
 ```
 
 It's recommended that you also use a soft word wrap mode like `+word-wrap-mode`
