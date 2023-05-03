@@ -1375,27 +1375,36 @@ keywords, properties, classes, objects, and functions."
     "Format CANDIDATE's meta property for display."
     (format " (%s)" (get-text-property 0 'meta candidate)))
 
-(defun tads3--get-libraries (t3m-file)
+(defun tads3--run-awk (program &rest files)
+    (message "Running cmd: %s" (concat "awk '" program "' " (mapconcat (lambda (file) (concat "'" file "'")) files " ")))
+    (-filter (lambda (s) (length> s 0))
+        (string-split
+            (shell-command-to-string
+                (concat "awk '" program "' " (mapconcat (lambda (file) (concat "'" file "'")) files " ")))
+            "\n")))
+
+(defun tads3--get-library-source-files (t3m-file)
     "Get all of the libraries referenced in T3M-FILE."
-    (let ((dir (file-name-directory (directory-file-name t3m-file))))
-        (-map (lambda (library-file) (concat dir (file-name-directory (directory-file-name library-file))))
-            (-filter (lambda (s) (length> s 0))
-                (string-split
-                    (shell-command-to-string
-                        (concat "awk '/^-lib .*$/ { if ($2 != \"system\") print $2 }' " t3m-file))
-                    "\n")))))
+    (let* ((dir (file-name-directory (directory-file-name t3m-file)))
+              (library-files (-map (lambda (library-file) (concat dir library-file ".tl"))
+                                 (tads3--run-awk "/^-lib .*$/ { if ($2 != \"system\") print $2 }" t3m-file))))
+        (-flatten
+            (-map (lambda (library-file)
+                      (let ((library-dir (file-name-directory (directory-file-name library-file))))
+                          (-map
+                              (lambda (source-file) (concat library-dir source-file ".t"))
+                              (tads3--run-awk "match($0, /^source: (\\w+).*$/, a) { print a[1] }" library-file))))
+                library-files))))
 
 (defun tads3--get-source-files ()
     "After a file is saved, reload all the symbols in the whole project."
     (let* ((t3m-file (car (tads3-locate-file)))
            (toplevel-dir (file-name-directory t3m-file))
            (source-files (directory-files-recursively toplevel-dir "\\.t$"))
-           (libraries (tads3--get-libraries t3m-file))
-           (library-source-files (-flatten
-                                     (-map
-                                         (lambda (dir) (directory-files-recursively dir "\\.t$"))
-                                         libraries))))
-        (append source-files library-source-files)))
+           (library-source-files (tads3--get-library-source-files t3m-file)))
+        ;; user source files second so the definitions in the library source
+        ;; files override the uses in the user source files
+        (append library-source-files source-files)))
 
 (defvar tads3--last-source-update-time
     nil
@@ -1483,6 +1492,11 @@ keywords list."
 
 ;;; Miscellaneous: ------------------------------------------------------------
 
+(defun tads3-jump-to-definition ()
+    "Jump to the file and line number where the identifier under the cursor was declared."
+    (interactive)
+    )
+
 (defun tads3-make-project (makefile)
     "Builds the .t3m file given by MAKEFILE for a project.
 
@@ -1502,7 +1516,7 @@ Since the makefile name/path is the same as the project name, uses that as the p
          (t3m-files (directory-files t3m-dir nil file-regex t)))
     (if (null t3m-files)
         (error "No t3m files found")
-      (mapcar (lambda (file) (file-name-concat t3m-dir file) ) t3m-files))))
+      (-map (lambda (file) (expand-file-name (file-name-concat t3m-dir file))) t3m-files))))
 
 (defun tads3-add-src-file-to-t3m ()
   "Adds the current file to the project t3make file(s). "
