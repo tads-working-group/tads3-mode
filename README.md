@@ -72,7 +72,7 @@ something nonsense later on.
 ## Dependencies
 
 - Emacs 29.1 or newer
-- the awk language (should come with your OS by default on macOS, BSD, and Linux)
+- GNU Awk
 
 ## Installation
 
