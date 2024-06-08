@@ -1318,7 +1318,7 @@ keywords list."
                                                tads3--last-source-update-time
                                                (file-attribute-modification-time (file-attributes file)))))
                            (tads3--get-source-files))))
-           (tag-output (generate-new-buffer "*TADS tag generation*"))
+           (tag-output (get-buffer-create "*TADS tag generation*"))
            (tag-process (apply #'start-process
                                `("tag-generation-process"
                                  ,tag-output
@@ -1353,7 +1353,7 @@ keywords list."
                                                                     tads3--identifiers))
                                                           (_ (message "Unexpected tag line format: %s" tag))))
                                                   (message "TADS completion tags refreshed."))
-                                          (message "TADS tag reading process exited with message: " (buffer-string))))))
+                                          (message "TADS tag reading process exited unsuccessfully with message: " (buffer-string))))))
         ;; This function is run when a file is saved, so the current file (which
         ;; was the one just saved) is always going to be the latest-modified one,
         ;; so that's the time we'll use for when this run happened
@@ -1371,8 +1371,7 @@ keywords list."
                   (maphash (lambda (keyword props)
                                (when (or (and (= (char-before (car bounds)) ?\.)
                                               (memq (car props) '(property method action verb sub-object)))
-                                         (and (not (= (char-before (car bounds)) ?\.))
-                                              (not (memq (car props) '(property method sub-object)))))
+                                         (not (= (char-before (car bounds)) ?\.)))
                                    (push (propertize keyword 'meta props) alist)))
                            tads3--identifiers)
                   alist)
