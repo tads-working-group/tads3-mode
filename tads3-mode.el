@@ -121,13 +121,15 @@
     (require 'rx))
 
 (require 'cl-lib)
+(require 'xref)
 
 ;;; ======General customization variables======
 (defconst tads3-mode-version "1.4")
 
 (defgroup tads3
     nil
-    "A customization group for TADS 3 Mode.")
+    "A customization group for TADS 3 Mode."
+    :group 'programming)
 
 (defcustom tads3-startup-message t
     "*Non-nil means display a message when TADS 3 mode is loaded."
@@ -434,8 +436,7 @@ are on the same line as other code in TADS code."
 
           ;; Double quoted strings
           (,tads3-description-regexp 0 'tads3-description-face t)
-          ,(tads3-match-inside tads3-description-regexp tads3-substitution-regexp `'tads3-substitution-face)
-          ))
+          ,(tads3-match-inside tads3-description-regexp tads3-substitution-regexp `'tads3-substitution-face)))
     "Expressions to fontify in TADS mode.")
 
 
@@ -912,9 +913,9 @@ Otherwise return nil and don't move point."
             nil)))
 
 (defun tads3-beginning-of-defun ()
-    (interactive)
     "Move either to what we think is start of TADS function or object, or,
 if not found, to the start of the buffer."
+    (interactive)
     (beginning-of-line)
     (while (not (or (tads3-looking-at-defun) (= (point) (point-min))))
         (and (re-search-backward (concat "^" tads3-defun-regexp) nil 'move)
@@ -1170,13 +1171,13 @@ preserving the comment indentation or line-starting decorations."
            indent-type)
         (insert ?\n)
         (setq indent-type (tads3-calculate-indent))
-        (delete-backward-char 1)
+        (delete-char -1)
         (if (eq indent-type nil)
                 ;; string
                 (let* ((indent-col (prog2
                                            (insert ?\n)
                                            (tads3-calculate-indent-within-string)
-                                       (delete-backward-char 1)))
+                                       (delete-char -1)))
                        (start (1+ (re-search-backward "[^\\]\"")))
                        (end (progn (forward-char 1) (re-search-forward "[^\\]\"")))
                        (fill-column (- fill-column 2))
@@ -1325,7 +1326,7 @@ keywords list."
                                  "-e" ,tads3--identifiers-program . ,files))))
         (message "Rereading TADS files: %s" files)
         (set-process-sentinel tag-process
-                              (lambda (proc event)
+                              (lambda (proc _event)
                                   (with-current-buffer (process-buffer proc)
                                       (if (and (equal (process-status proc) 'exit)
                                                (= 0 (process-exit-status proc)))
@@ -1350,7 +1351,7 @@ keywords list."
                                                                                (cons (list file linenum)
                                                                                      (cadr (gethash name tads3--identifiers))))
                                                                     tads3--identifiers))
-                                                          (t (message "Unexpected tag line format: %s" tag))))
+                                                          (_ (message "Unexpected tag line format: %s" tag))))
                                                   (message "TADS completion tags refreshed."))
                                           (message "TADS tag reading process exited with message: " (buffer-string))))))
         ;; This function is run when a file is saved, so the current file (which
@@ -1456,10 +1457,10 @@ Finds the .t3m file in the current directory, or a parent directory."
                               (completing-read "Choose t3 game file to run: " game-files)
                           (car game-files)))
            (game-buffer-name (concat "*interpreter*<" game-file ">")))
-        (when *tads3-interpreter-process*
-            (delete-process *tads3-interpreter-process*)
-            (setq *tads3-interpreter-process* nil))
-        (setq *tads3-interpreter-process* (start-process tads3-interpreter game-buffer-name tads3-interpreter (file-truename game-file)))))
+        (when tads3--interpreter-process
+            (delete-process tads3--interpreter-process)
+            (setq tads3--interpreter-process nil))
+        (setq tads3--interpreter-process (start-process tads3-interpreter game-buffer-name tads3-interpreter (file-truename game-file)))))
 
 (defun tads3-next-object (&optional arg)
     "Go to the next object or class declaration in the file.
@@ -1606,9 +1607,6 @@ With a negative prefix arg, go forwards."
 
 (defun tads3-electric-enter (arg)
     (interactive "P")
-    (if tads3-strip-trailing-whitespace
-            (delete-backward-char (- (save-excursion
-                                         (skip-chars-backward " \t")))))
     (newline)
     (if tads3-auto-indent-after-newline (tads3-indent-line)))
 
