@@ -25,31 +25,36 @@ This version of the plugin requires Emacs 28.1 (the latest, currently) or later.
   erroring out)
 - Clearer specification of what something is in the imenu list of objects,
   functions, modifications, etc.
-- Updated code for modern Emacs Lisp
+- **Significantly** updated code for modern Emacs Lisp/modern Emacs versions
 - An in-editor build system that lets you compile the project the current file
   belongs to, even if the project root is in a parent directory, with a single
   key combination, and puts the output of the compiler in a split window where
   you can click on errors to jump to them in your code.
-- in-editor running in your interpreter of choice
-- somewhat context-aware autocompletion generated from *all* of your project
-  files and the libraries listed in your *t3m* build file whenever you save a
+- In-editor running in your interpreter of choice
+- Somewhat context-aware autocompletion generated from *all* of your project
+  files and the libraries listed in your `t3m` build file whenever you save a
   new modification!
+- Crude jump-to-definition support with xrefs (it is very difficult to truly
+  figure out where something was defined in TADS 3 because of how dynamic it
+  is, but it works well for objects, classes, functions, just ends up being
+  more of an occurence check for methods, sub-objects, and properties)
+- Completion using `completion-at-point-functions` instead of hard-coding a
+  company-mode backend
+- Support for company-kinds (not limited to company mode), so you can have
+  icons in your completion popup if you like that sort of thing
 
 ## Roadmap
 
-### To finish v1.4
+- [x] Autocompletetion
 - [x] Compilation, Error-checking and jump-to-error
 - [x] Add source file to t3m
 - [x] Running the game in editor and refreshing it on build
+- [x] Jump to definition
 - [ ] Running test scripts
 - [ ] Spellcheck that knows how to deal with TADS text
 - [ ] Word count that understands TADS text
 - [ ] Strings viewer (the compiler can output all strings)
 - [ ] Uploading the plugin to MELPA
-
-### For 2.0
-
-- [x] Autocompletetion
 - [ ] Refactoring tools
 - [ ] Documentation for thing at point
 
@@ -66,8 +71,7 @@ something nonsense later on.
 
 ## Dependencies
 
-- Emacs 28.1 or newer
-- company-mode
+- Emacs 29.1 or newer
 - the awk language (should come with your OS by default on macOS, BSD, and Linux)
 
 ## Installation
@@ -83,9 +87,6 @@ DOOM, etc.):
       (append (list (cons "\\.t$" 'tads3-mode))
               auto-mode-alist))
 ```
-
-It's recommended that you also use a soft word wrap mode like `+word-wrap-mode`
-with this plugin, since you'll be writing lots of long lines of text.
 
 ## Screenshots
 

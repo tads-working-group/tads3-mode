@@ -1,5 +1,4 @@
-;;; tads3-mode.el --- TADS 3 mode
-;; -*- lexical-binding: t; -*-
+;;; tads3-mode.el --- A mode for editing TADS 3 code    -*- lexical-binding: t; -*-
 
 ;;;;;;;;;;;
 ;; Homepage: https://github.com/alexispurslane/tads3-mode
@@ -119,173 +118,155 @@
 ;;; Code:
 
 (eval-when-compile
-    (require 'rx)
-    (require 'cl-lib))
+    (require 'rx))
 
-;;; General variables: --------------------------------------------------------
+(require 'cl-lib)
 
+;;; ======General customization variables======
 (defconst tads3-mode-version "1.4")
 
-(defvar tads3-startup-message t
-    "*Non-nil means display a message when TADS 3 mode is loaded.")
+(defgroup tads3
+    nil
+    "A customization group for TADS 3 Mode.")
 
-(defvar tads3-no-c++-comments nil
-    "*If t, C++-style comments \(//\) are not fontified or treated as comments.")
+(defcustom tads3-startup-message t
+    "*Non-nil means display a message when TADS 3 mode is loaded."
+    :type 'boolean
+    :group 'tads3)
 
-(defvar tads3-strip-trailing-whitespace t
-    "*If t (the default), delete any trailing whitespace when ENTER is pressed.")
+(defcustom tads3-no-c++-comments nil
+    "*If t, C++-style comments \(//\) are not fontified or treated as comments."
+    :type 'boolean
+    :group 'tads3)
 
-(defvar tads3-mode-abbrev-table nil)
+(defcustom tads3-strip-trailing-whitespace t
+    "*If t (the default), delete any trailing whitespace when ENTER is pressed."
+    :type 'boolean
+    :group 'tads3)
 
-(defvar tads3-mode-map nil
-    "Keymap used in TADS 3 mode.")
-
-(if tads3-mode-map nil
-    (setq tads3-mode-map (make-sparse-keymap))
-
-    ;; major mode commands
-    (define-key tads3-mode-map (kbd "M-n") 'tads3-next-object)
-    (define-key tads3-mode-map (kbd "M-p") 'tads3-prev-object)
-    (define-key tads3-mode-map (kbd "M-t") 'tads3-inside-block-comment)
-    (define-key tads3-mode-map (kbd "C-c C-c") 'tads3-build)
-    (define-key tads3-mode-map (kbd "C-c C-1") 'tads3-run)
-    (define-key tads3-mode-map (kbd "<f5>") 'tads3-build)
-    (define-key tads3-mode-map (kbd "<f4>") 'tads3-run)
-
-    ;; Electric keys
-    (define-key tads3-mode-map "{" 'tads3-electric-brace)
-    (define-key tads3-mode-map ";" 'tads3-electric-semi)
-    (define-key tads3-mode-map "#" 'tads3-electric-sharp-sign)
-    (define-key tads3-mode-map "*" 'tads3-electric-splat)
-    (define-key tads3-mode-map "\t" 'tads3-indent-command)
-    (define-key tads3-mode-map "\r" 'tads3-electric-enter))
-
-(defvar tads3-install-path
-    "/usr/local/bin/"
-    "The location where the frob interpreter and the TADS 3 compiler reside.")
-
-(defvar tads3-interpreter
-    "/usr/local/bin/qtads"
+(defcustom tads3-interpreter
+    (executable-find "qtads")
     "The executable for tads3-mode to launch when you run your game.
 
-QTADS is recommended for full freature support, but frobTADS and Gargoyle will also work if you are writing a text only game.")
+QTADS is recommended for full freature support, but frobTADS and
+Gargoyle will also work if you are writing a text only game."
+    :type 'string
+    :group 'tads3)
 
-;;; Indentation parameters: ---------------------------------------------------
+;;; ======Indentation parameters======
+(defcustom tads3-indent-level 4
+    "*Indentation of lines of block relative to first line of block."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-indent-level 4
-    "*Indentation of lines of block relative to first line of block.")
+(defcustom tads3-label-offset -2
+    "*Indentation of label relative to where it should be."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-label-offset -2
-    "*Indentation of label relative to where it should be.")
-
-(defvar tads3-indent-continued-string t
+(defcustom tads3-indent-continued-string t
     "*If t (the default), strings continued from the previous line
-are indented.")
+are indented."
+    :type 'boolean
+    :group 'tads3)
 
-(defvar tads3-continued-string-offset 1
+(defcustom tads3-continued-string-offset 1
     "*How much to indent continued strings by compared to the first line
 of the string. This is only used if `tads3-indent-continued-string' is
-true.")
+true."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-continued-string-offset-from-line 2
+(defcustom tads3-continued-string-offset-from-line 2
     "*How much to indent continued strings by compared to the first line
 of the command containing the string, if that command is not purely
 the string itself. This is only used if `tads3-indent-continued-string'
-is false.")
+is false."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-brace-imaginary-offset 0
-    "*Imagined indentation of a TADS open brace that actually follows a statement.")
+(defcustom tads3-brace-imaginary-offset 0
+    "*Imagined indentation of a TADS open brace that actually follows a statement."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-brace-offset 0
-    "*Extra indentation of braces compared to other text in the same context.")
+(defcustom tads3-brace-offset 0
+    "*Extra indentation of braces compared to other text in the same context."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-continued-statement-offset 4
-    "*Extra indentation for lines which do not begin new statements.")
+(defcustom tads3-continued-statement-offset 4
+    "*Extra indentation for lines which do not begin new statements."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-continued-brace-offset -4
+(defcustom tads3-continued-brace-offset -4
     "*Extra indentation for substatements which begin with an open brace.
-This is in addition to `tads3-continued-statement-offset'.")
+This is in addition to `tads3-continued-statement-offset'."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-indent-cont-statement 4
-    "*Indentation of continuation relative to start of statement.")
+(defcustom tads3-indent-cont-statement 4
+    "*Indentation of continuation relative to start of statement."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-auto-indent-after-newline t
+(defcustom tads3-auto-indent-after-newline t
     "*If t (the default), automatically indent the next line after
-RETURN is pressed.")
+RETURN is pressed."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3-tab-always-indent t
-    "*If t (the default), always indent the current line when tab is pressed.")
+(defcustom tads3-tab-always-indent t
+    "*If t (the default), always indent the current line when tab is pressed."
+    :type 'number
+    :group 'tads3)
 
 ;; I don't know how to fix the original version which also inserts newlines
 ;; before and after the braces when enabled. - AP
-(defvar tads3-auto-newline t
+(defcustom tads3-auto-newline t
     "*If t, automatically add after semicolons and before braces that
-are on the same line as other code in TADS code.")
+are on the same line as other code in TADS code."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3--locate-t3m-regexp "\\.t3m$"
-    "*Regexp for locating t3make files in parent directories.")
+(defcustom tads3--locate-t3m-regexp "\\.t3m$"
+    "*Regexp for locating t3make files in parent directories."
+    :type 'number
+    :group 'tads3)
 
-(defvar tads3--locate-t3-regexp "\\.t3$"
-    "*Regexp for locating t3 game files in parent directories.")
+(defcustom tads3--locate-t3-regexp "\\.t3$"
+    "*Regexp for locating t3 game files in parent directories."
+    :type 'number
+    :group 'tads3)
 
-;;; Syntax variables: ---------------------------------------------------------
+;;; ======Syntax variables======
+(defvar tads3-mode-syntax-table
+    (let ((tads3-mode-syntax-table (make-syntax-table)))
+        (modify-syntax-entry ?\\ "\\" tads3-mode-syntax-table)
+        (modify-syntax-entry ?/ ". 14" tads3-mode-syntax-table)
+        (modify-syntax-entry ?* ". 23" tads3-mode-syntax-table)
+        (modify-syntax-entry ?+ "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?- "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?= "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?% "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?< "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?> "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?& "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?| "." tads3-mode-syntax-table)
+        (modify-syntax-entry ?\" "\"" tads3-mode-syntax-table)
+        (modify-syntax-entry ?\' "\'" tads3-mode-syntax-table)
+        ;; any reason NOT to have _ as a word constituent?  Makes things simpler.
+        (modify-syntax-entry ?_ "w" tads3-mode-syntax-table)
+        ;; C++ style comments
+        (if tads3-no-c++-comments
+                nil
+            (modify-syntax-entry ?/ ". 124" tads3-mode-syntax-table)
+            (modify-syntax-entry ?* ". 23b" tads3-mode-syntax-table)
+            (modify-syntax-entry ?\n ">" tads3-mode-syntax-table))
 
-(defvar tads3-mode-syntax-table nil
+        tads3-mode-syntax-table)
     "Syntax table used in TADS mode.")
-
-(if tads3-mode-syntax-table
-        nil
-    (setq tads3-mode-syntax-table (make-syntax-table))
-    (modify-syntax-entry ?\\ "\\" tads3-mode-syntax-table)
-    (modify-syntax-entry ?/ ". 14" tads3-mode-syntax-table)
-    (modify-syntax-entry ?* ". 23" tads3-mode-syntax-table)
-    (modify-syntax-entry ?+ "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?- "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?= "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?% "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?< "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?> "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?& "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?| "." tads3-mode-syntax-table)
-    (modify-syntax-entry ?\" "\"" tads3-mode-syntax-table)
-    (modify-syntax-entry ?\' "\'" tads3-mode-syntax-table)
-    ;; any reason NOT to have _ as a word constituent?  Makes things simpler.
-    (modify-syntax-entry ?_ "w" tads3-mode-syntax-table)
-    ;; C++ style comments
-    (if tads3-no-c++-comments
-            ()
-        (modify-syntax-entry ?/ ". 124" tads3-mode-syntax-table)
-        (modify-syntax-entry ?* ". 23b" tads3-mode-syntax-table)
-        (modify-syntax-entry ?\n ">" tads3-mode-syntax-table)))
-
-                                        ;(defvar tads-functions-list
-                                        ;  '("addword" "askdo" "askfile" "askio" "caps" "car" "cdr"
-                                        ;    "clearscreen" "cvtnum" "cvtstr" "datatype" "defined" "delword"
-                                        ;    "endTurn" "execCommand" "fclose" "find" "firstobj" "firstsc" "fopen"
-                                        ;    "fseek" "fseekof" "fwrite" "getarg" "getfuse" "gettime" "getwords"
-                                        ;    "incturn" "input" "inputdialog" "inputevent" "inputkey" "inputline"
-                                        ;    "isclass" "length" "logging" "lower" "nextobj" "nocaps" "notify"
-                                        ;    "objwords" "outcapture" "parseAskobjIndirect" "parseNounList"
-                                        ;    "parserDictLookup" "parserGetMe" "parserGetObj" "parserGetTokTypes"
-                                        ;    "parserReplaceCommand" "parserResolveObjects" "parserSetMe"
-                                        ;    "parserTokenize" "postAction" "preCommand" "proptype" "quit" "rand"
-                                        ;    "randomize" "reGetGroup" "remdaemon" "remfuse" "reSearch"
-                                        ;    "resourceExists" "restart" "restore" "rundaemons" "runfuses" "save"
-                                        ;    "say" "setdaemon" "setfuse" "setit" "setOutputFilter" "setscore"
-                                        ;    "setversion" "skipturn" "substr" "systemInfo" "timeDelay" "undo"
-                                        ;    "unnotify" "upper" "verbInfo" "yorn")
-                                        ;  "List of TADS built-in functions.")
-
-;; A function to aid my own failing memory of how to print objects
-                                        ;(defun tads-make-regexp ()
-                                        ;  (interactive)
-                                        ;  (insert (make-regexp tads3-functions-list)))
-
-                                        ;(defvar tads-keywords-list
-                                        ;  "List of TADS keywords.")
-
-;; The following regexps were made from the above commented lists using
-;; Simon Marshall's make-regexp package (thanks, Gareth!).
 
 (eval-and-compile
 
@@ -382,8 +363,7 @@ are on the same line as other code in TADS code.")
 (defconst tads3-method-def-regexp "[\t ]*\\(\\_<[a-zA-Z0-9_]+\\_>\\)\\(?:(.*)\\)?\\(?:[\n\t ]*{\\)$")
 (defconst tads3-function-call-regexp "\\(?:;\\)?[\t \r]*\\(\\_<[a-zA-Z0-9_]+\\_>\\)([^);]*)\s*;")
 
-;;; Font-lock keywords: -------------------------------------------------------
-
+;;; ======Font-lock keywords======
 (defvar tads3-font-lock-defaults
     '(tads3-font-lock-keywords nil nil ((?_ . "w")) tads3-prev-object)
     "Font Lock defaults for TADS mode.")
@@ -458,112 +438,43 @@ are on the same line as other code in TADS code.")
           ))
     "Expressions to fontify in TADS mode.")
 
-
-;;; TADS mode: ----------------------------------------------------------------
 
+;;; ======TADS mode======
 
-(defun tads3-mode ()
-    "Major mode for editing TADS programs.
+(defvar tads3-mode-abbrev-table nil)
 
-* TADS syntax:
+(defvar tads3-mode-map
+    (let ((tads3-mode-map (make-sparse-keymap)))
+        ;; major mode commands
+        (define-key tads3-mode-map (kbd "M-n") 'tads3-next-object)
+        (define-key tads3-mode-map (kbd "M-p") 'tads3-prev-object)
+        (define-key tads3-mode-map (kbd "M-t") 'tads3-inside-block-comment)
+        (define-key tads3-mode-map (kbd "C-c C-c") 'tads3-build)
+        (define-key tads3-mode-map (kbd "C-c C-1") 'tads3-run)
 
-  Type \\[indent-for-tab-command] to indent the current line.
-  Type \\[indent-region] to indent the region.
+        ;; NOTE: According to "Key Binding Conventions" in the Emacs
+        ;; Lisp manual, these are reserved for the user:
 
-* Navigating in a file:
+        ;;(define-key tads3-mode-map (kbd "<f5>") 'tads3-build)
+        ;;(define-key tads3-mode-map (kbd "<f4>") 'tads3-run)
 
-  Type \\[tads3-prev-object] to go to the previous object/class declaration.
-  Type \\[tads3-next-object] to go to the next one.
+        ;; Electric keys
+        (define-key tads3-mode-map "{" 'tads3-electric-brace)
+        (define-key tads3-mode-map ";" 'tads3-electric-semi)
+        (define-key tads3-mode-map "#" 'tads3-electric-sharp-sign)
+        (define-key tads3-mode-map "*" 'tads3-electric-splat)
+        (define-key tads3-mode-map "\t" 'tads3-indent-command)
+        (define-key tads3-mode-map "\r" 'tads3-electric-enter)
+        tads3-mode-map)
+    "Keymap used in TADS 3 mode.")
 
-* Font-lock support:
-
-  Put \(add-hook 'tads3-mode-hook 'turn-on-font-lock) in your .emacs file.
-
-*Key definitions:
-
-\\{tads3-mode-map}
-* Miscellaneous user options:
-
-  tads3-startup-message
-    Set to nil to inhibit the message printed the first time TADS
-    mode is used.
-
-  tads3-auto-newline
-    If true, automatically insert a newline before and after
-    braces, and after colons and semicolons.
-
-  tads3-no-c++-comments
-    Set to true to not treat C++-style comments \(//\) as comments.
-
-  tads3-strip-trailing-whitespace
-    If true (the default), all whitespace at the end of a line will
-    be removed when RETURN is pressed.
-
-  tads3-mode-hook
-    The hook that is run after entering TADS mode.
-
-* User options controlling indentation style:
-
-  Values in parentheses are the default indentation style.
-
-  tads3-indent-level \(4\)
-    Indentation of code inside an object relative to the first
-    line of the block.
-
-  tads3-brace-offset \(0\)
-    Extra indentation for a brace as compared to text in the same
-    context.
-
-  tads3-brace-imaginary-offset \(0\)
-    Imagined indentation for an open brace that follows a statement.
-
-  tads3-indent-cont-statement \(4\)
-    Indentation of continuation relative to start of statement.
-
-  tads3-continued-statement-offset \(4\)
-    Extra indentation for lines which do not begin new statements
-
-  tads3-continued-brace-offset \(-4\)
-    Extra indentation for substatements which start with an open brace.
-    This is in addition to `tads3-continued-statement-offset'.
-
-  tads3-label-offset \(-2\)
-    Extra indentation for line that is a label, or case or default.
-
-  tads3-indent-continued-string \(t\)
-    If true, strings which span more than one line are all indented
-    the same amount.
-
-  tads3-continued-string-offset \(1\)
-    How much to indent continued strings by compared to the first line
-    of the string. This is only used if `tads3-indent-continued-string'
-    is true.
-
-  tads3-continued-string-offset-from-line \(2\)
-    How much to indent continued strings by compared to the first line
-    of the command containing the string, if that command is not purely
-    the string itself. This is only used if `tads3-indent-continued-string'
-    is false.
-
-  tads3-auto-indent-after-newline \(t\)
-    If true, then pressing RETURN also indents the new line that is
-    created.
-
-  tads3-tab-always-indents \(t\)
-    If true, TAB always indents the current line when pressed.
-
-  tads3-auto-newline \(nil\)
-    If true, automatically add newlines after semicolons in TADS code."
-    (interactive)
-    (if tads3-startup-message
-            (message "Emacs TADS mode version %s by Alexis Purslane, Brett W, and Stephen Granade."
-                     tads3-mode-version))
-    (kill-all-local-variables)
-    (use-local-map tads3-mode-map)
-    (setq major-mode 'tads3-mode)
-    (setq mode-name "TADS 3")
-    (setq local-abbrev-table tads3-mode-abbrev-table)
-    (set-syntax-table tads3-mode-syntax-table)
+;;;###autoload
+(define-derived-mode tads3-mode
+    prog-mode "TADS 3"
+    "Major mode for TADS 3 programs."
+    :syntax-table tads3-mode-syntax-table
+    :aggrev-table tads3-mode-abbrev-table
+    :group 'tads3
 
     (setq-local paragraph-start (concat "^$\\|" page-delimiter))
     (setq-local paragraph-separate paragraph-start)
@@ -585,13 +496,10 @@ are on the same line as other code in TADS code.")
     (setq-local parse-sexp-ignore-comments t)
     (setq-local font-lock-defaults tads3-font-lock-defaults)
 
-    (add-to-list (make-local-variable 'company-backends) 'tads3--company-backend)
-    (company-mode t)
-
     (add-hook 'tads3-mode-hook 'tads3--reload-identifiers)
     (add-hook (make-local-variable 'after-save-hook) 'tads3--reload-identifiers)
-
-    (run-hooks 'tads3-mode-hook))
+    (add-hook 'completion-at-point-functions #'tads3--completion-at-point nil t)
+    (add-hook 'xref-backend-functions #'tads3--xref-backend))
 
 ;; This is used by indent-for-comment
 ;; to decide how much to indent a comment in C code
@@ -1307,78 +1215,46 @@ preserving the comment indentation or line-starting decorations."
                     ;; Return T so that `fill-paragaph' doesn't try anything.
                     t))))
 
-;; ; Company-mode Autocompletion: ---------------------------------------------
-
-(defvar tads3--company-identifiers
+;;; ======Autocompletion======
+(defvar tads3--identifiers
     #s(hash-table
        size 5000
        test equal
-       data ("abort" (list "keyword" nil)
-             "argcount" (list "keyword" nil)
-             "break" (list "keyword" nil)
-             "continue" (list "keyword" nil)
-             "class" (list "keyword" nil)
-             "case" (list "keyword" nil)
-             "delete" (list "keyword" nil)
-             "do" (list "keyword" nil)
-             "else" (list "keyword" nil)
-             "enum" (list "keyword" nil)
-             "exit" (list "keyword" nil)
-             "obj" (list "keyword" nil)
-             "for" (list "keyword" nil)
-             "function" (list "keyword" nil)
-             "goto" (list "keyword" nil)
-             "if" (list "keyword" nil)
-             "inherited" (list "keyword" nil)
-             "local" (list "keyword" nil)
-             "modify" (list "keyword" nil)
-             "new" (list "keyword" nil)
-             "nil" (list "keyword" nil)
-             "pass" (list "keyword" nil)
-             "replace" (list "keyword" nil)
-             "return" (list "keyword" nil)
-             "self" (list "keyword" nil)
-             "switch" (list "keyword" nil)
-             "true" (list "keyword" nil)
-             "try" (list "keyword" nil)
-             "template" (list "keyword" nil)
-             "while" (list "keyword" nil)
-             "static" (list "keyword" nil)
-             "finally" (list "keyword" nil)))
+       data ("abort" (keyword nil)
+             "argcount" (keyword nil)
+             "break" (keyword nil)
+             "continue" (keyword nil)
+             "class" (keyword nil)
+             "case" (keyword nil)
+             "delete" (keyword nil)
+             "do" (keyword nil)
+             "else" (keyword nil)
+             "enum" (keyword nil)
+             "exit" (keyword nil)
+             "obj" (keyword nil)
+             "for" (keyword nil)
+             "function" (keyword nil)
+             "goto" (keyword nil)
+             "if" (keyword nil)
+             "inherited" (keyword nil)
+             "local" (keyword nil)
+             "modify" (keyword nil)
+             "new" (keyword nil)
+             "nil" (keyword nil)
+             "pass" (keyword nil)
+             "replace" (keyword nil)
+             "return" (keyword nil)
+             "self" (keyword nil)
+             "switch" (keyword nil)
+             "true" (keyword nil)
+             "try" (keyword nil)
+             "template" (keyword nil)
+             "while" (keyword nil)
+             "static" (keyword nil)
+             "finally" (keyword nil)))
     "TADS 3 identifiers (classes, objects, sub-objects, methods,
 functions, properties, verbs, and actions) generated by the AWK
 tags script, plus the core keywords.")
-
-(defun tads3--hash-filter-map-collect (fn hash)
-    (let ((lst nil))
-        (maphash
-         (lambda (key val)
-             (let ((res (apply fn (list key val))))
-                 (unless (eq res nil)
-                     (push res lst))))
-         hash)
-        lst))
-
-(defun tads3--is-property-type (props)
-    (or (equal (car props) "property")
-        (equal (car props) "sub-object")
-        (equal (car props) "method")))
-
-(defun tads3--company-candidates (prefix)
-    "Get the candidates starting with PREFIX from the list of tads3
-keywords, properties, classes, objects, and functions."
-    (let ((in-property (equal (char-before (- (point) (length prefix))) ?\.)))
-        (tads3--hash-filter-map-collect
-         (lambda (keyword props)
-             (when (and
-                    (xor in-property (not (tads3--is-property-type props)))
-                    (string-prefix-p prefix keyword))
-                 (propertize keyword 'meta (car props))))
-         tads3--company-identifiers)))
-
-(defun tads3--company-annotation (candidate)
-    "Format CANDIDATE's meta property for display."
-    (format " (%s)" (get-text-property 0 'meta candidate)))
 
 (defun tads3--run-awk (program &rest files)
     (message "Running cmd: %s" (concat "awk '" program "' " (mapconcat (lambda (file) (concat "'" file "'")) files " ")))
@@ -1417,14 +1293,14 @@ keywords, properties, classes, objects, and functions."
 
 (defconst tads3--identifiers-program
     "
-match($0, /^(\\w+):\\s*.*$/, a) { if (!seen[a[1]]++) print a[1], \"object\", FILENAME, FNR }
-match($0, /^class (\\w+):\\s*.*$/, a) { if (!seen[a[1]]++) print a[1], \"class\", FILENAME, FNR }
-match($0, /^([a-z]\\w+)\\(.*\\)/, a) { if (!seen[a[1]]++) print a[1], \"function\", FILENAME, FNR }
-match($0, /^[ \\t]+([a-z]\\w+)\\(.*\\)/, a) { if (!seen[a[1]]++) print a[1], \"method\", FILENAME, FNR }
-match($0, /^[A-Z]\\w+\\(([^)]+)\\)\\s*.*\\s*:\\s*.*$/, a) { if (!seen[a[1]]++) print a[1], \"verb\", FILENAME, FNR }
-match($0, /^Define[TAI]+Action\\(([^)]+)\\)$/, a) { if (!seen[a[1]]++) print a[1], \"action\", FILENAME, FNR }
-match($0, /^\\++\\s*(\\w+):.*$/, a) { if (!seen[a[1]]++) print a[1], \"sub-object\", FILENAME, FNR }
-match($0, /^[ \\t]+(\\w+) = /, a) { if (!seen[a[1]]++) print a[1], \"property\", FILENAME, FNR }
+match($0, /^(\\w+):\\s*.*$/, a) { print a[1], \"object\", FILENAME, FNR }
+match($0, /^class (\\w+):\\s*.*$/, a) { print a[1], \"class\", FILENAME, FNR }
+match($0, /^([a-z]\\w+)\\(.*\\)/, a) { print a[1], \"function\", FILENAME, FNR }
+match($0, /^[ \\t]+([a-z]\\w+)\\(.*\\)/, a) { print a[1], \"method\", FILENAME, FNR }
+match($0, /^[A-Z]\\w+\\(([^)]+)\\)\\s*.*\\s*:\\s*.*$/, a) { print a[1], \"verb\", FILENAME, FNR }
+match($0, /^Define[TAI]+Action\\(([^)]+)\\)$/, a) { print a[1], \"action\", FILENAME, FNR }
+match($0, /^\\++\\s*(\\w+):.*$/, a) { print a[1], \"sub-object\", FILENAME, FNR }
+match($0, /^[ \\t]+(\\w+) = /, a) { print a[1], \"property\", FILENAME, FNR }
 ")
 
 (defun tads3--reload-identifiers ()
@@ -1434,73 +1310,98 @@ command was run, load all the identifiers in them into the
 keywords list."
     (message "New TADS file saved or loaded, rereading tags... (last read: %s)" tads3--last-source-update-time)
 
-    ;; this is `lexical-let` instead of regular `let' beacuse for some reason
-    ;; the `lexical-binding' variable at the top of the file isn't working. >:c
-    (lexical-let* ((files (mapcar #'expand-file-name
-                                  (cl-remove-if-not
-                                   (lambda (file) (or (equal tads3--last-source-update-time nil)
-                                                      (time-less-p
-                                                       tads3--last-source-update-time
-                                                       (file-attribute-modification-time (file-attributes file)))))
-                                   (tads3--get-source-files))))
-                   (ident-output (generate-new-buffer " keywords"))
-                   (ident-process (start-process-shell-command
-                                   "get-ident-process"
-                                   ident-output
-                                   (concat "awk '" tads3--identifiers-program "' "
-                                           (mapconcat (lambda (file) (concat "'" file "'")) files " ")))))
+    (let* ((files (mapcar #'expand-file-name
+                          (cl-remove-if-not
+                           (lambda (file) (or (equal tads3--last-source-update-time nil)
+                                              (time-less-p
+                                               tads3--last-source-update-time
+                                               (file-attribute-modification-time (file-attributes file)))))
+                           (tads3--get-source-files))))
+           (tag-output (generate-new-buffer "*TADS tag generation*"))
+           (tag-process (apply #'start-process
+                               `("tag-generation-process"
+                                 ,tag-output
+                                 ,(executable-find "awk")
+                                 "-e" ,tads3--identifiers-program . ,files))))
+        (message "Rereading TADS files: %s" files)
+        (set-process-sentinel tag-process
+                              (lambda (proc event)
+                                  (with-current-buffer (process-buffer proc)
+                                      (if (and (equal (process-status proc) 'exit)
+                                               (= 0 (process-exit-status proc)))
+                                              (progn 
+                                                  (message "TADS tag reading process exited successfully.")
+                                                  ;; remove all the identifiers from the files that we're
+                                                  ;; re-evaluating, so that if the files now have fewer
+                                                  ;; identifiers, when they add their remaining identifiers
+                                                  ;; back in, the removed ones will dissapear from completions.
+                                                  (maphash (lambda (ident props)
+                                                               (when (member (cadr props) files)
+                                                                   (remhash ident tads3--identifiers)))
+                                                           tads3--identifiers)
+                                                  ;; add new identifiers
+                                                  (dolist (tag (string-split (buffer-string) "\n"))
+                                                      (pcase (string-split tag " ")
+                                                          (`(,(and name (guard (not (string-empty-p name))))
+                                                             ,kind
+                                                             ,file
+                                                             ,linenum)
+                                                           (puthash name (list (intern kind)
+                                                                               (cons (list file linenum)
+                                                                                     (cadr (gethash name tads3--identifiers))))
+                                                                    tads3--identifiers))
+                                                          (t (message "Unexpected tag line format: %s" tag))))
+                                                  (message "TADS completion tags refreshed."))
+                                          (message "TADS tag reading process exited with message: " (buffer-string))))))
+        ;; This function is run when a file is saved, so the current file (which
+        ;; was the one just saved) is always going to be the latest-modified one,
+        ;; so that's the time we'll use for when this run happened
+        (let ((time (file-attribute-modification-time (file-attributes (buffer-file-name)))))
+            (when (or (equal tads3--last-source-update-time nil)
+                      (time-less-p tads3--last-source-update-time time))
+                (setq tads3--last-source-update-time time)))))
 
-                  (message "rereading files: %s" files)
-                  (set-process-sentinel ident-process
-                                        (lambda (proc event)
-                                            (message "Tag-reading process status %s (exit code %s)" (process-status proc) (process-exit-status proc))
-
-                                            (when (and (equal (process-status proc) 'exit)
-                                                       (= 0 (process-exit-status proc)))
-                                        ; remove all the identifiers from the files that we're
-                                        ; re-evaluating, so that if the files now have fewer
-                                        ; identifiers, when they add their remaining identifiers
-                                        ; back in, the removed ones will dissapear from completions.
-                                                (maphash (lambda (ident props)
-                                                             (when (member (cadr props) files)
-                                                                 (message "deleting %s from file: %s" ident (cadr props))
-                                                                 (remhash ident tads3--company-identifiers)))
-                                                         tads3--company-identifiers)
-                                                (with-current-buffer (process-buffer proc)
-                                                    (let ((idents (mapcar (lambda (x) (string-split x " ")) (string-split (buffer-string) "\n"))))
-
-                                                        ;; add new identifiers
-                                                        (dolist (ident idents)
-                                                            (when (and (length> ident 2) (not (equal (car ident) "")))
-                                                                (puthash (car ident) (cdr ident) tads3--company-identifiers)))
-                                                        (message "lines: %d" (length idents)))))))
-                  ;; This function is run when a file is saved, so the current file (which
-                  ;; was the one just saved) is always going to be the latest-modified one,
-                  ;; so that's the time we'll use for when this run happened
-                  (let ((time (file-attribute-modification-time (file-attributes (buffer-file-name)))))
-                      (when (or (equal tads3--last-source-update-time nil)
-                                (time-less-p tads3--last-source-update-time time))
-                          (setq tads3--last-source-update-time time)))))
-
-(defun tads3--company-backend (command &optional arg &rest ignored)
-    "Company autocomplete backend for TADS 3."
-    (interactive (list 'interactive))
-
-    (cl-case command
-        (interactive (company-begin-backend 'tads3--company-backend))
-        (prefix (when (eq major-mode 'tads3-mode) (company-grab-symbol-cons "\\." 2)))
-        (candidates (tads3--company-candidates arg))
-        (annotation (tads3--company-annotation arg))
-        (meta (format "This will use %s of %s"
-                      (get-text-property 0 'meta arg)
-                      (substring-no-properties arg)))))
-
-;;; Miscellaneous: ------------------------------------------------------------
-
-(defun tads3-jump-to-definition ()
-    "Jump to the file and line number where the identifier under the cursor was declared."
+(defun tads3--completion-at-point ()
     (interactive)
-    )
+    (let ((pt (point)) (bounds (bounds-of-thing-at-point 'word)))
+        (message "char du jour %s" (char-before (car bounds)))
+        (list (car bounds) (cdr bounds)
+              (let (alist)
+                  (maphash (lambda (keyword props)
+                               (when (or (and (= (char-before (car bounds)) ?\.)
+                                              (memq (car props) '(property method action verb sub-object)))
+                                         (and (not (= (char-before (car bounds)) ?\.))
+                                              (not (memq (car props) '(property method sub-object)))))
+                                   (push (propertize keyword 'meta props) alist)))
+                           tads3--identifiers)
+                  alist)
+              :exclusive 'no
+              :company-kind
+              (lambda (candidate) (car (get-text-property 0 'meta candidate)))
+              :annotation-function
+              (lambda (candidate) (format " %s" (car (get-text-property 0 'meta candidate)))))))
+;; ;;; ======Xref======
+(defun tads3--xref-backend ()
+    (when (eq major-mode 'tads3-mode)
+        'tads3-xref))
+
+(cl-defmethod xref-backend-identifier-at-point ((_backend (eql tads3-xref)))
+    (when-let* ((identifier (thing-at-point 'word))
+                (identifier-value (gethash identifier tads3--identifiers)))
+        identifier))
+
+(cl-defmethod xref-backend-definitions ((_backend (eql tads3-xref)) identifier)
+    (let* ((metadata (gethash identifier tads3--identifiers)))
+        (mapcar (lambda (location)
+                    (pcase location
+                        (`(,file ,linenum)
+                         (xref-make (format "%s" (car metadata))
+                                    (make-xref-file-location :file file
+                                                             :line (string-to-number linenum)
+                                                             :column 0)))
+                        (_ nil)))
+                (cadr metadata))))
+;;; ======Miscellaneous======
 
 (defun tads3-make-project (makefile)
     "Builds the .t3m file given by MAKEFILE for a project.
@@ -1510,7 +1411,7 @@ Since the makefile name/path is the same as the project name, uses that as the p
         (when (get-buffer comp-buffer-name)
             (delete-windows-on (get-buffer comp-buffer-name))
             (kill-buffer comp-buffer-name))
-        (compile (concat tads3-install-path "t3make -d -f " makefile))))
+        (compile (concat "t3make -d -f " makefile))))
 
 ;; We assume multiple t3make files, in case there is a webui version and a standard.
 (defun tads3-locate-file (&optional regex)
@@ -1544,7 +1445,7 @@ Finds the .t3m file in the current directory, or a parent directory."
                                     (completing-read "Choose t3m file to build: " t3m-files)
                                 (car t3m-files)))))
 
-(defvar *tads3-interpreter-process* nil
+(defvar tads3--interpreter-process nil
     "Holds the current running interpreter process.")
 
 (defun tads3-run ()
@@ -1658,8 +1559,7 @@ With a negative prefix arg, go forwards."
          (not (looking-at "[ \t]*default[ \t]*:"))))
 
 
-;;; Electric commands: --------------------------------------------------------
-
+;;; ======Electric commands======
 (defun tads3-electric-brace (arg)
     "Insert character and correct line's indentation."
     (interactive "P")
@@ -1753,6 +1653,6 @@ With a negative prefix arg, go forwards."
                     (self-insert-command (prefix-numeric-value arg)))
             (self-insert-command (prefix-numeric-value arg)))))
 
-(provide 'tads3)
+(provide 'tads3-mode)
 
 ;;; tads3-mode.el ends here
