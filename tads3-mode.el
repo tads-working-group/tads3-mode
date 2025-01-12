@@ -1284,7 +1284,8 @@ tags script, plus the core keywords.")
                                          (lambda (source-file) (concat library-dir source-file ".t"))
                                          (condition-case-unless-debug e
                                                  (tads3--run-awk "match($0, /^source: (\\w+).*$/, a) { print a[1] }" library-file)
-                                             (error (message "Ignored error: %s" (error-message-string e))))))
+                                             (error (message "Ignored error: %s" (error-message-string e))
+                                                    (list)))))
                                 (list)))
                         library-files))))
 
