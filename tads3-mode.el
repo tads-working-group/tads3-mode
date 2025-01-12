@@ -1260,11 +1260,15 @@ tags script, plus the core keywords.")
 (defun tads3--run-awk (program &rest files)
     (message "Running cmd: %s" (concat "awk '" program "' " (mapconcat (lambda (file) (shell-quote-argument file)) files " ")))
     (cl-remove-if-not (lambda (s) (length> s 0))
-                      (apply #'process-lines-handling-status
-                             (append (list "awk"
-                                           nil
-                                           program)
-                                     (mapcar #'expand-file-name files)))))
+                      (let* ((error-signaled nil)
+                             (result (apply #'process-lines-handling-status
+                                            (append (list "awk"
+                                                          (lambda (e) (setq error-signaled (> e 0)))
+                                                          program)
+                                                    (mapcar #'expand-file-name files)))))
+                          (if error-signaled
+                                  (error (car result))
+                              result))))
 
 (defun tads3--get-library-source-files (t3m-file)
     "Get all of the libraries referenced in T3M-FILE."
@@ -1278,7 +1282,9 @@ tags script, plus the core keywords.")
                                     (let ((library-dir (file-name-directory library-file)))
                                         (mapcar
                                          (lambda (source-file) (concat library-dir source-file ".t"))
-                                         (tads3--run-awk "match($0, /^source: (\\w+).*$/, a) { print a[1] }" library-file)))
+                                         (condition-case-unless-debug e
+                                                 (tads3--run-awk "match($0, /^source: (\\w+).*$/, a) { print a[1] }" library-file)
+                                             (error (message "Ignored error: %s" (error-message-string e))))))
                                 (list)))
                         library-files))))
 
