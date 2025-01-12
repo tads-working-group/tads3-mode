@@ -121,7 +121,6 @@
     (require 'rx))
 
 (require 'cl-lib)
-(require 'xref)
 
 ;;; ======General customization variables======
 (defconst tads3-mode-version "1.4")
@@ -496,11 +495,52 @@ are on the same line as other code in TADS code."
     (setq-local comment-indent-function 'tads3-comment-indent)
     (setq-local parse-sexp-ignore-comments t)
     (setq-local font-lock-defaults tads3-font-lock-defaults)
+    (with-eval-after-load 'eglot
+        (add-to-list 'eglot-server-programs
+                     '(tads3-mode . ("vscode-tads3tools-server-linux-x64" "--stdio")))
+        (dir-locals-set-class-variables
+         'tads3-lsp-workspace
+         '((tads3-mode . ((eglot-workspace-configuration
+                           . (:tads3
+                              ( :tads3.enableScriptFiles t
+                                :tads3.scriptFolderName "Scripts"
+                                :tads3.maximumScriptFiles 25
+                                :tads3.restartGameRunnerOnT3ImageChanges nil
+                                :tads3.gameRunnerInterpreter "frob"
+                                :tads3.maxNumberOfParseWorkerThreads 6
+                                :tads3.parseOnlyTheWorkspaceFiles nil
+                                :tads3.enableWorkspaceSymbolsProjectScope nil
+                                :tads3.maxNumberOfProblems 100
+                                :tads3.trace.server "messages"
+                                :tads.preprocessor.path "t3make"
+                                :tads2.compiler.path "tadsc"
+                                :tads2.library.path "/usr/local/share/frobtads/tads2/"
+                                :tads3.compiler.path "t3make"
+                                :tads3.adv3.library "/usr/local/share/frobtads/tads3/lib/adv3/"
+                                :tads3.adv3Lite.library "/usr/local/share/frobtads/tads3/lib/adv3Lite/"
+                                :tads3.lib "/usr/local/share/frobtads/tads3/lib/"
+                                :tads3.include "/usr/local/share/frobtads/tads3/include"
+                                :tads3.enablePreprocessorCodeLens nil
+                                :tads3.ifArchiveExtensionURL "http://ifarchive.org/if-archive/programming/tads3/library/contributions/"
+                                :tads2.ifArchiveExtensionURL "http://ifarchive.org/if-archive/programming/tads2/examples/")))))))
+        (dir-locals-set-directory-class (project-root (project-current)) 'tads3-lsp-workspace)
+        (add-hook 'eglot-connect-hook
+                  (lambda (server)
+                      (cl-defmethod eglot-handle-notification (_server :response/makefile/keyvaluemap &rest params)
+                          (message "TADS server found makefile and responded with: %s" params))
+                      (cl-defmethod eglot-handle-notification (_server :symbolparsing/allfiles/success &rest params)
+                          (message "TADS server succeeded in parsing all files in %s time." params))
+                      (cl-defmethod eglot-handle-notification (_server :symbolparsing/allfiles/failed &rest params)
+                          (message "TADS server failed in parsing all files, with error %s." params))
 
-    (add-hook 'tads3-mode-hook 'tads3--reload-identifiers)
-    (add-hook (make-local-variable 'after-save-hook) 'tads3--reload-identifiers)
-    (add-hook 'completion-at-point-functions #'tads3--completion-at-point nil t)
-    (add-hook 'xref-backend-functions #'tads3--xref-backend))
+                      ;; (jsonrpc-async-request server
+                      ;;                        :request/parseDocuments
+                      ;;                        (list
+                      ;;                         :makefileLocation (car (tads3-locate-file))
+                      ;;                         :filePaths (apply #'vector (tads3--get-source-files)))
+                      ;;                        :success-fn (lambda (result) (prin1 result))
+                      ;;                        :error-fn   (lambda (error) (prin1 error)))
+                      ))))
 
 ;; This is used by indent-for-comment
 ;; to decide how much to indent a comment in C code
@@ -1215,50 +1255,13 @@ preserving the comment indentation or line-starting decorations."
 
                     ;; Return T so that `fill-paragaph' doesn't try anything.
                     t))))
-
-;;; ======Autocompletion======
-(defvar tads3--identifiers
-    #s(hash-table
-       size 5000
-       test equal
-       data ("abort" (keyword nil)
-             "argcount" (keyword nil)
-             "break" (keyword nil)
-             "continue" (keyword nil)
-             "class" (keyword nil)
-             "case" (keyword nil)
-             "delete" (keyword nil)
-             "do" (keyword nil)
-             "else" (keyword nil)
-             "enum" (keyword nil)
-             "exit" (keyword nil)
-             "obj" (keyword nil)
-             "for" (keyword nil)
-             "function" (keyword nil)
-             "goto" (keyword nil)
-             "if" (keyword nil)
-             "inherited" (keyword nil)
-             "local" (keyword nil)
-             "modify" (keyword nil)
-             "new" (keyword nil)
-             "nil" (keyword nil)
-             "pass" (keyword nil)
-             "replace" (keyword nil)
-             "return" (keyword nil)
-             "self" (keyword nil)
-             "switch" (keyword nil)
-             "true" (keyword nil)
-             "try" (keyword nil)
-             "template" (keyword nil)
-             "while" (keyword nil)
-             "static" (keyword nil)
-             "finally" (keyword nil)))
-    "TADS 3 identifiers (classes, objects, sub-objects, methods,
-functions, properties, verbs, and actions) generated by the AWK
-tags script, plus the core keywords.")
+;;; ======Miscellaneous======
 
 (defun tads3--run-awk (program &rest files)
+    <<<<<<< variant A
     (message "Running cmd: %s" (concat "awk '" program "' " (mapconcat (lambda (file) (shell-quote-argument file)) files " ")))
+    >>>>>>> variant B
+    ======= end
     (cl-remove-if-not (lambda (s) (length> s 0))
                       (let* ((error-signaled nil)
                              (result (apply #'process-lines-handling-status
@@ -1299,121 +1302,6 @@ tags script, plus the core keywords.")
         ;; files override the uses in the user source files
         (append library-source-files source-files)))
 
-(defvar tads3--last-source-update-time
-    nil
-    "The last time tads3--reload-identifiers was run.")
-
-(defconst tads3--identifiers-program
-    "
-match($0, /^(\\w+):\\s*.*$/, a) { print a[1], \"object\", FILENAME, FNR }
-match($0, /^class (\\w+):\\s*.*$/, a) { print a[1], \"class\", FILENAME, FNR }
-match($0, /^([a-z]\\w+)\\(.*\\)/, a) { print a[1], \"function\", FILENAME, FNR }
-match($0, /^[ \\t]+([a-z]\\w+)\\(.*\\)/, a) { print a[1], \"method\", FILENAME, FNR }
-match($0, /^[A-Z]\\w+\\(([^)]+)\\)\\s*.*\\s*:\\s*.*$/, a) { print a[1], \"verb\", FILENAME, FNR }
-match($0, /^Define[TAI]+Action\\(([^)]+)\\)$/, a) { print a[1], \"action\", FILENAME, FNR }
-match($0, /^\\++\\s*(\\w+):.*$/, a) { print a[1], \"sub-object\", FILENAME, FNR }
-match($0, /^[ \\t]+(\\w+) = /, a) { print a[1], \"property\", FILENAME, FNR }
-")
-
-(defun tads3--reload-identifiers ()
-    "Goes through each source file in this project or in the libraries
-it depends on, and if they've changed since the last time this
-command was run, load all the identifiers in them into the
-keywords list."
-    (message "New TADS file saved or loaded, rereading tags... (last read: %s)" tads3--last-source-update-time)
-
-    (let* ((files (mapcar #'expand-file-name
-                          (cl-remove-if-not
-                           (lambda (file) (or (equal tads3--last-source-update-time nil)
-                                              (time-less-p
-                                               tads3--last-source-update-time
-                                               (file-attribute-modification-time (file-attributes file)))))
-                           (tads3--get-source-files))))
-           (tag-output (get-buffer-create "*TADS tag generation*"))
-           (tag-process (apply #'start-process
-                               `("tag-generation-process"
-                                 ,tag-output
-                                 ,(executable-find "awk")
-                                 "-e" ,tads3--identifiers-program . ,files))))
-        (message "Rereading TADS files: %s" files)
-        (set-process-sentinel tag-process
-                              (lambda (proc _event)
-                                  (with-current-buffer (process-buffer proc)
-                                      (if (and (equal (process-status proc) 'exit)
-                                               (= 0 (process-exit-status proc)))
-                                              (progn
-                                                  (message "TADS tag reading process exited successfully.")
-                                                  ;; remove all the identifiers from the files that we're
-                                                  ;; re-evaluating, so that if the files now have fewer
-                                                  ;; identifiers, when they add their remaining identifiers
-                                                  ;; back in, the removed ones will dissapear from completions.
-                                                  (maphash (lambda (ident props)
-                                                               (when (member (cadr props) files)
-                                                                   (remhash ident tads3--identifiers)))
-                                                           tads3--identifiers)
-                                                  ;; add new identifiers
-                                                  (dolist (tag (string-split (buffer-string) "\n"))
-                                                      (pcase (string-split tag " ")
-                                                          (`(,(and name (guard (not (string-empty-p name))))
-                                                             ,kind
-                                                             ,file
-                                                             ,linenum)
-                                                           (puthash name (list (intern kind)
-                                                                               (cons (list file linenum)
-                                                                                     (cadr (gethash name tads3--identifiers))))
-                                                                    tads3--identifiers))
-                                                          (_ (message "Unexpected tag line format: %s" tag))))
-                                                  (message "TADS completion tags refreshed."))
-                                          (message "TADS tag reading process exited unsuccessfully with message: " (buffer-string))))))
-        ;; This function is run when a file is saved, so the current file (which
-        ;; was the one just saved) is always going to be the latest-modified one,
-        ;; so that's the time we'll use for when this run happened
-        (let ((time (file-attribute-modification-time (file-attributes (buffer-file-name)))))
-            (when (or (equal tads3--last-source-update-time nil)
-                      (time-less-p tads3--last-source-update-time time))
-                (setq tads3--last-source-update-time time)))))
-
-(defun tads3--completion-at-point ()
-    (interactive)
-    (let ((pt (point)) (bounds (bounds-of-thing-at-point 'word)))
-        (message "char du jour %s" (char-before (car bounds)))
-        (list (car bounds) (cdr bounds)
-              (let (alist)
-                  (maphash (lambda (keyword props)
-                               (when (or (and (= (char-before (car bounds)) ?\.)
-                                              (memq (car props) '(property method action verb sub-object)))
-                                         (not (= (char-before (car bounds)) ?\.)))
-                                   (push (propertize keyword 'meta props) alist)))
-                           tads3--identifiers)
-                  alist)
-              :exclusive 'no
-              :company-kind
-              (lambda (candidate) (car (get-text-property 0 'meta candidate)))
-              :annotation-function
-              (lambda (candidate) (format " %s" (car (get-text-property 0 'meta candidate)))))))
-;; ;;; ======Xref======
-(defun tads3--xref-backend ()
-    (when (eq major-mode 'tads3-mode)
-        'tads3-xref))
-
-(cl-defmethod xref-backend-identifier-at-point ((_backend (eql tads3-xref)))
-    (when-let* ((identifier (thing-at-point 'word))
-                (identifier-value (gethash identifier tads3--identifiers)))
-        identifier))
-
-(cl-defmethod xref-backend-definitions ((_backend (eql tads3-xref)) identifier)
-    (let* ((metadata (gethash identifier tads3--identifiers)))
-        (mapcar (lambda (location)
-                    (pcase location
-                        (`(,file ,linenum)
-                         (xref-make (format "%s" (car metadata))
-                                    (make-xref-file-location :file file
-                                                             :line (string-to-number linenum)
-                                                             :column 0)))
-                        (_ nil)))
-                (cadr metadata))))
-;;; ======Miscellaneous======
-
 (defun tads3-make-project (makefile)
     "Builds the .t3m file given by MAKEFILE for a project.
 
@@ -1427,13 +1315,7 @@ Since the makefile name/path is the same as the project name, uses that as the p
 ;; We assume multiple t3make files, in case there is a webui version and a standard.
 (defun tads3-locate-file (&optional regex)
     "Return a list of t3make files in this directory, or the first parent directory that contains any. "
-    (let* ((file-regex (or regex tads3--locate-t3m-regexp))
-           (this-dir (file-name-directory (buffer-file-name)))
-           (t3m-dir (locate-dominating-file this-dir (lambda (dir) (directory-files dir nil file-regex t))))
-           (t3m-files (directory-files t3m-dir nil file-regex t)))
-        (if (null t3m-files)
-                (error "No t3m files found")
-            (mapcar (lambda (file) (expand-file-name (file-name-concat t3m-dir file))) t3m-files))))
+    (directory-files (project-root (project-current)) t (or regex tads3--locate-t3m-regexp)))
 
 (defun tads3-add-src-file-to-t3m ()
     "Adds the current file to the project t3make file(s). "
