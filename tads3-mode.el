@@ -533,14 +533,13 @@ are on the same line as other code in TADS code."
                       (cl-defmethod eglot-handle-notification (_server :symbolparsing/allfiles/failed &rest params)
                           (message "TADS server failed in parsing all files, with error %s." params))
 
-                      ;; (jsonrpc-async-request server
-                      ;;                        :request/parseDocuments
-                      ;;                        (list
-                      ;;                         :makefileLocation (car (tads3-locate-file))
-                      ;;                         :filePaths (apply #'vector (tads3--get-source-files)))
-                      ;;                        :success-fn (lambda (result) (prin1 result))
-                      ;;                        :error-fn   (lambda (error) (prin1 error)))
-                      ))))
+                      (jsonrpc-async-request server
+                                             :request/parseDocuments
+                                             (list
+                                              :makefileLocation (car (tads3-locate-file)))
+                                             :success-fn (lambda (result) (prin1 result))
+                                             :error-fn   (lambda (error) (prin1 error)))
+                      (remove-hook 'before-save-hook 'eglot-format-buffer t)))))
 
 ;; This is used by indent-for-comment
 ;; to decide how much to indent a comment in C code
@@ -1258,10 +1257,6 @@ preserving the comment indentation or line-starting decorations."
 ;;; ======Miscellaneous======
 
 (defun tads3--run-awk (program &rest files)
-    <<<<<<< variant A
-    (message "Running cmd: %s" (concat "awk '" program "' " (mapconcat (lambda (file) (shell-quote-argument file)) files " ")))
-    >>>>>>> variant B
-    ======= end
     (cl-remove-if-not (lambda (s) (length> s 0))
                       (let* ((error-signaled nil)
                              (result (apply #'process-lines-handling-status
